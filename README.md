@@ -147,7 +147,7 @@ SELECT DISTINCT(column) FROM table
   ```
 - 패턴 매칭 연산자를 겨랍하여 더 복잡한 패턴을 생성할 수 있다.
   ```sql
-  # Cheryl, Theresa, Sherri
+  -- Cheryl, Theresa, Sherri
   WHERE name LIKE '_her%';
   ```
 - PostgreSQL은 `LIKE` 및 `ILIKE` 외에 전체적인 정규표현식 기능을 지원한다.
@@ -236,7 +236,7 @@ SELECT DISTINCT(column) FROM table
   ```
 - 집계 결과는 `WHERE` 절이 실행된 이후 발생하기 때문에 `WHERE`를 사용하여 필터링할 수 없다.
   ```sql
-  # WHERE 필터링을 적용하고 나서 GROUP BY로 호출한 후에 HAVING에 판매액 총액이 1,000달러보다 큰 값을 조건으로 다시 필터링
+  -- WHERE 필터링을 적용하고 나서 GROUP BY로 호출한 후에 HAVING에 판매액 총액이 1,000달러보다 큰 값을 조건으로 다시 필터링
   SELECT company, SUM(sales)
   FROM finance_table
   WHERE company != 'Google'
@@ -299,7 +299,7 @@ SELECT DISTINCT(column) FROM table
   ------     ------
 ```
 ```sql
-# 벤다이어그램이 대칭이기 때문에 테이블 순서를 바꿔도 같은 결과가 나온다.
+-- 벤다이어그램이 대칭이기 때문에 테이블 순서를 바꿔도 같은 결과가 나온다.
 SELECT * FROM Table_A
 FULL OUTER JOIN Table_B
 ON Table_A.col_match = Table_B.col_match
@@ -536,23 +536,155 @@ SELECT column_name(s) FROM Table2
 - field
   - CENTURY, DAY, DOW, DOY, EPOCH, HOUR, MILLISECOND, MINUTE, MONTH, QUARTER, SECOND, WEEK, YEAR
 
+```sql
+SELECT NOW(); -- 2023-04-26 13:46:12.170282+09 <- 수요일
+select extract('DOW' FROM NOW()); -- 3
+select extract('CENTURY' FROM now()); -- 21
+```
 #### AGE
 
 - `AGE()`함수는 특정날짜를 지정하면 해당 날짜에서의 나이를 출력한다.
 - `AGE(data_col)`
 
-### TO_CHAR
+#### TO_CHAR
 
 - 데이터 유형을 텍스트로 변환하는 일반 기능이다.
 - 형식 지정을 위한 타임 스탬프에 유용하다.
   - ex) `TO_CHAR(data_col, 'mm-dd) 
+- https://www.postgresql.org/docs/15/functions-formatting.html
 
+### String 함수
 
+```sql
+SELECT UPPER(first_name) || ' ' || UPPER(last_name) AS name FROM customer;
+```
 
 ## 서브쿼리(Sub Query)
 
+> 서브쿼리는 알려지지 않은 기준을 이용한 검색을 위해 사용한다.
+
+- 서브쿼리를 이용하면 다른 쿼리의 결과에 대한 메인쿼리의 일부로 수행하여 복잡한 쿼리를 구성할 수 있다.
+- 구문은 간단하며 두 개의 `SELECT` 문을 포함한다.
+- 좋은 자료: https://dataonair.or.kr/db-tech-reference/d-guide/sql/?mod=document&uid=349
+
+### SQL문에서 서브쿼리를 사용할 수 있는 절
+
+- SELECT
+- FROM
+- WHERE
+- HAVING
+- ORDER BY
+- INSERT 문의 VALUES
+- UPDATE 문의 SET
+
+### 조인과 서브쿼리 차이점
+
+- 조인은 조인에 참여하는 모든 테이블이 대등한 관계에 있기 때문에 조인에 참여하는 모든 테이블의 칼럼을 어느 위치에서라도 자유롭게 사용할 수 있다.
+  - 조직(1)과 사원(M) 테이블을 조인하면 결과는 사원 레벨(M)의 집합이 생성된다.
+  - M:N 관계의 테이블을 조인하면 MN(= M * N) 레벨의 집합이 결과로서 생성된다.
+  - 1:1 관계의 테이블을 조인하면 1(= 1 * 1) 레벨의 집합이 생성된다.
+- 서브쿼리는 메인쿼리의 칼럼을 모두 사용할 수 있지만 메인쿼리는 서브쿼리의 칼럼을 사용할 수 없다.
+  - 따라서 질의 결과에 서브쿼리 칼럼을 표시해야 한다면 조인 방식으로 변환하거나 함수, 스칼라 서브쿼리(Scalar Subquery) 등을 사용해야 한다.
+  - 서브쿼리는 서브쿼리 레벨과는 상관없이 항상 메인쿼리 레벨로 결과 집합이 생성된다.
+- SQL문에서 서브쿼리 방식을 사용해야 할 때 잘못 판단하여 조인 방식을 사용하는 경우가 있다.
+  - 결과는 조직 레벨(1)이고 사원 테이블(M)에서 체크해야 할 조건이 존재하는 경우
+  - 이런 상황에서 SQL문을 작성할 때 조인을 사용한다면 결과 집합은 사원(M) 레벨이 될 것이다.
+    - 이렇게 되면 원하는 결과가 아니기 때문에 SQL문에 DISTINCT를 추가해서 결과를 다시 조직(1) 레벨로 만들어야 한다.
+  - 따라서 조인 방식이 아니라 서브쿼리 방식을 사용해야 한다.
+    - 메인쿼리로 조직을 사용하고 서브쿼리로 사원 테이블을 사용하면 결과 집합은 조직 레벨이 되어 원하는 결과를 얻을 수 있다.
+
+### 서브쿼리 사용 시 주의사항
+
+1. 서브쿼리를 괄호로 감싸서 사용한다.
+2. 서브쿼리는 단일 행(Single Row) 또는 복수 행(Multiple Row) 비교 연산자와 함께 사용 가능하다.
+    - 단일 행 비교 연산자는 서브쿼리의 결과가 반드시 1건 이하이어야 한다.
+    - 복수 행 비교 연산자는 서브쿼리의 결과 건수와 상관 없다.
+3. 서브쿼리에서 `ORDER BY`를 사용하지 못한다.
+    - `ORDER BY` 절은 `SELECT` 절에서 오직 한 개만 올 수 있기 때문에 `ORDER BY`절은 메인쿼리의 마지막 문장에 위치해야 한다.
+
+### 서브쿼리 분류
+
+#### 단일 행(Single Row) 서브쿼리
+
+- 서브쿼리의 실행 결과가 **반드시 1건 이하**인 서브쿼리를 의미한다.
+- 단일 행 서브쿼리는 단일 행 비교 연산자와 함께 사용 가능하다.
+- 단일 행 비교 연산자: `=`, `<`, `<=`, `>`, `>=`, `<>`
+
 ```sql
+-- 평균 등수보다 높은 학생들 조회
 SELECT student, grade
 FROM test_scores
 WHERE grade > (SELECT AVG(grade) FROM test_scores);
+```
+
+#### 다중 행(Multi Row) 서브쿼리
+
+- 서브쿼리의 실행 결과가 여러 건인 서브쿼리를 의미한다.
+- 다중 행 서브쿼리는 다중 행 비교 연산자와 함께 사용된다.
+- 다중 행 비교 연산자: `IN`, `ALL`, `ANY`, `SOME`, `EXISTS`
+  - `IN (서브쿼리)`: 서브쿼리의 결과에 존재하는 임의의 값과 동일한 조건을 의미한다.
+  - `비교연산자 ALL (서브쿼리)`: 서브쿼리의 결과에 존재하는 모든 값을 만족하는 조건을 의미한다.
+    - 비교연산자로 `>`를 사용했다면 메인쿼리는 서브쿼리의 모든 결과값을 만족해야 하므로, 서브쿼리 결과의 최대값보다 큰 모든 건이 조건을 만족한다.
+  - `비교연산자 ANY (서브쿼리)`: 서브쿼리의 결과에 존재하는 어느 하나의 값이라도 만족하는 조건을 의미한다.
+    - 비교연산자로 `>`를 사용했다면 메인쿼리는 서브쿼리의 값들 중 어떤 값이라도 만족하면 되므로,
+    - 서브쿼리의 결과의 최솟값보다 큰 모든 건이 조건을 만족한다.
+  - `EXISTS`: 서브쿼리의 결과를 만족하는 값이 존재하는지 여부를 확인하는 조건을 의미한다.
+    - 여러 건이더라도 1건만 찾으면 더 이상 검색하지 않고 메인쿼리의 결과를 반환한다.
+```sql
+-- rental이 2023-01-03일자인 영화 제목 조회
+SELECT film_id, title -- 영화 제목 조회
+FROM film
+WHERE film_id IN
+(SELECT inventory.film_id -- 렌탈일자가 2023-01-03인 영화 id들 조회
+FROM rental
+INNER JOIN inventory ON inventory.inventory_id = rantal.inventory_id
+WHERE rental_date BETWEEN '2023-01-03' AND '2023-01-04')
+```
+
+- `EXISTS` 연산자는 서브쿼리에 행이 있는지 테스트하는데 사용된다.
+  - 일반적으로 서브쿼리는 `EXISTS` 함수에서 전달되어 서브쿼리와 함께 반환되는 행이 있는지 확인한다.
+
+#### 다중 컬럼(Multi Column) 서브쿼리
+
+- 서브쿼리의 실행 결과로여러 칼럼을 반환한다.
+- 메인쿼리의 조건절에 여러 칼럼을 동시에 비교할 수 있다.
+- 서브쿼리와 메인쿼리에서 비교하고자 하는 칼럼 개수와 칼럼의 위치가 동일해야 한다.
+
+### 기타 서브쿼리
+
+#### 스칼라 서브쿼리
+
+- SELECT 절에서 사용하는 서브쿼리이다.
+- scalar는 '한 번에 한 가지만 처리하는'이라는 뜻을 가지고 있듯이 스칼라 서브쿼리에 의해 나오는 결과는 **하나의 행**이어야 한다.
+
+```sql
+-- 고객마다 총구매액 조회
+SELECT id, (SELECT SUM(cost_amount) AS avgperid
+			FROM orders o
+			WHERE o.customer_id = c.id)
+FROM customers c;
+
+SELECT c.id, SUM(cost_amount) as avgperid
+FROM customers c, orders o
+WHERE c.id = o.customer_id
+GROUP BY c.id;
+```
+- 만약 해당 스칼라 서브쿼리가 2개 이상의 레코드를 조회한다면 에러가 발생한다.
+
+#### FROM 절에서 서브쿼리
+
+- FROM 절에서 사용되는 서브쿼리를 인라인 뷰(Inline View)라고 한다.
+  - 서브쿼리의 결과가 실행 시 동적으로 생성된 테이블인 것처럼 사용할 수 있다.
+  - 인라인 뷰는 SQL문이 실행될 때만 임시적으로 생성되는 동적인 뷰이기 때문에 데이터베이스에 해당 정보가 저장되지 않는다.
+    - 그래서 일반적인 뷰를 정적 뷰(Static View)라 하고, 인라인 뷰를 동적 뷰(Dynamic View)라고도 한다.
+  - 인라인 뷰는 테이블 명이 올 수 있는 곳에 사용할 수 있고 이를 사용하는 것은 조인 방식을 사용하는 것과 같다.
+    - 따라서 인라인 뷰의 칼럼은 SQL 문에서 자유롭게 참조할 수 있다.
+
+```sql
+-- 양파를 구매한 고객들을 서브쿼리를 이용해 조회
+SELECT c.name, o.bought_at
+FROM (SELECT customer_id, created_at as bought_at
+FROM orders
+WHERE product_name = '양파') o, customers c
+WHERE o.customer_id = c.id;
 ```
