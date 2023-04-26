@@ -496,7 +496,8 @@ SELECT column_name(s) FROM Table2
   - `show timezone;`
 - 타임존 설정(변경)
   - `set timezone = 'America/Los_Angeles';`
-- Date and Time 정보와 관련된 데이터 타입:
+
+### Date and Time 정보와 관련된 데이터 타입
   - `TIME`: 시간만 포함
     - 15:03:30.484561
   - `DATE`: 날짜만 포함
@@ -509,7 +510,8 @@ SELECT column_name(s) FROM Table2
     - 저장할 때는 UTC0 기준 timestamp로 변환되어 저장되고, 출력할 일이 있을 때 pg의 timezone 혹은 설정한 존으로 변환해 출력하게 된다.
     - 만약 위에 시차가 17시간 차이나는 로스엔젤레스로 타임존을 변경하게 되면 `2023-04-24 02:01:40.920477-07`(서머타임 적용, 원래는 -8)로 변경된다.
     - `timestamp` 타임존에 따른 시간 변경이 적용되지 않는다.
-- 이러한 날짜 및 시간 데이터 유형과 관련된 함수
+
+### 날짜 및 시간 데이터 유형과 관련된 함수
   - `NOW`
     - 현재시간을 타임존을 포함하여 반환한다.
     - 2023-04-24 18:25:24.08764+09
@@ -522,3 +524,35 @@ SELECT column_name(s) FROM Table2
   - `CURRENT_DATE`
     - 현재 날짜를 반환한다.
     - 2023-04-24
+
+### 시간 데이터 유형을 사용하여 정보 추출
+
+#### EXTRACT
+  
+- `EXTRACT()` 함수는 날짜/시간 데이터에서 year(년도), month(월), day(일)과 같은 요소를 추출/검색하는 함수이다.
+- `EXTRACT(field FROM source)`
+  - field는 year, month, day 등의 날짜/시간 데이터 요소를 말한다.
+  - source는 실제 timestamp 값을 의미한다. ex) '2023-04-25 15:00:00'
+- field
+  - CENTURY, DAY, DOW, DOY, EPOCH, HOUR, MILLISECOND, MINUTE, MONTH, QUARTER, SECOND, WEEK, YEAR
+
+#### AGE
+
+- `AGE()`함수는 특정날짜를 지정하면 해당 날짜에서의 나이를 출력한다.
+- `AGE(data_col)`
+
+### TO_CHAR
+
+- 데이터 유형을 텍스트로 변환하는 일반 기능이다.
+- 형식 지정을 위한 타임 스탬프에 유용하다.
+  - ex) `TO_CHAR(data_col, 'mm-dd) 
+
+
+
+## 서브쿼리(Sub Query)
+
+```sql
+SELECT student, grade
+FROM test_scores
+WHERE grade > (SELECT AVG(grade) FROM test_scores);
+```
