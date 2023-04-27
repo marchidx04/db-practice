@@ -943,3 +943,98 @@ DROP COLUMN col_one,
 DROP COLUMN col_two
 ```
 
+## 조건식과 프로시저(Conditional Expressions and Operators)
+
+### CASE
+
+- `CASE`는 특정 조건을 만날 때 SQL code를 실행시키기 위해 사용한다.
+- 다른 프로그래밍 언어들의 `IF/ELSE`와 비슷하다
+
+#### Syntax
+
+```sql
+CASE
+  WHEN condition1 THEN result1
+  WHEN condition2 THEN result2
+  ELSE some_other_result
+END
+
+SELECT a,                             ---------------------
+CASE WHEN a = 1 THEN 'one'           |    a     |   label  |
+     WHEN a = 2 THEN 'two'           |---------------------|
+ELSE 'other' AS label                |    1     |    one   |
+END                                  |    2     |    two   |
+FROM test;                            ---------------------
+```
+
+#### Syntax Expression Syntax
+
+```sql
+CASE expression
+  WHEN value1 THEN result1
+  WHEN value2 THEN result2
+  ELSE some_other_result
+END
+
+SELECT a,
+  CASE a WHEN 1 THEN 'one'
+         WHEN 2 THEN 'two'
+         ELSE 'other'
+  END
+FROM test;
+```
+
+#### CASE Example
+
+```sql
+SELECT customer_id,
+CASE
+      WHEN (customer_id <= 100) THEN 'Preminum'
+      WHEN (customer_id BETWEEN 101 and 200) THEN 'Plus'
+      ELSE 'Normal'
+END AS customer_class
+FROM customer;
+
+SELECT customer_id,
+CASE customer_id
+        WHEN 2 THEN 'Winner'
+        WHEN 5 THEN 'Second Place'
+        ELSE 'Normal'
+END AS customer_class
+FROM customer;
+
+SELECT
+SUM(CASE rental_rate
+          WHEN 0.99 THEN 1
+          ELSE 0
+END) AS number_of_bargains,
+SUM(CASE rental_rate
+          WHEN 2.99 THEN 1
+          WHEN 0
+END) AS regular,
+SUM(CASE rental_rate
+          WHEN 4.99 THEN 1
+          ELSE 0
+END) AS preminum
+FROM film; -- 각 개수 구하는데에도 CASE가 사용될 수 있다.
+```
+
+### COALESCE
+
+- `COALESCE` 함수는 `NULL`이 아닌 첫 번쨰 인수를 반환한다.
+  - `COALESCE` 함수는 인수에 제한이 없다.
+  - 모든 인수가 `NULL`이면 `COALESCE` 함수도 `NULL`을 반환한다.
+- `COALESCE (arg_1, arg_2, ..., arg_n)`
+  - `SELECT COALESCE (1, 2)` --> 1
+  - `SELECT COALESCE (NULL, 2, 3)` --> 2
+
+#### Example
+
+```sql
+SELECT item, (price - COALESCE(discount, 0)) AS final FROM table;
+```
+
+- `COALESCE` 함수는 `NULL`을 포함하는 테이블에 대해 질의문을 작성할 때 유용하다.
+  - 만약 해당 값이 `NULL`이면 다른 값으로 대체하도록 만들 수 있다.
+  
+
