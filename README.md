@@ -688,3 +688,258 @@ FROM orders
 WHERE product_name = '양파') o, customers c
 WHERE o.customer_id = c.id;
 ```
+
+## 데이터베이스 및 테이블 생성
+
+- 데이터 타입 관련 공식문서 자료: https://www.postgresql.org/docs/current/datatype.html
+
+### 제약 조건(Constraints)
+
+- `Constraints`는 테이블의 데이터 컬럼에 적용되는 규칙
+  - 잘못된 데이터가 데이터베이스에 입력되는 것을 방지하여 데이터의 정확성과 신뢰성을 보장할 수 있다.
+- 제약 조건은 주로 두 가지로 나뉜다.
+  - `열 제약 조건(Column Constraints)`
+    - 열의 데이터가 특정 조건을 준수하도록 제한하는 조건
+  - `테이블 제약 조건(Table Constraints)`
+    - 개별 컬럼이 아닌 전체 테이블에 적용되는 조건
+
+#### 가장 일반적으로 사용되는 제약 조건
+
+- `NOT NULL` 제약 조건
+  - 해당 컬럼을 `NULL` 값을 가질 수 없도록 제한
+- `UNIQUE` 제약 조건
+  - 해당 컬럼에서의 값이 유일하도록 제한
+- `PRIMARY KEY`
+  - 데이터베이스 테이블에서 각 행(레코드)를 고유하게 식별할 수 있는 키
+- `FOREIGN KEY`
+  - 해당 컬럼을 다른 테이블의 PK를 참조하도록 제한
+- `CHECK` 제약 조건
+  - 행의 모든 값이 특정한 조건을 만족하도록 한다.
+    ```sql
+    CREATE TABLE products (
+      product_no integer PRIMARY KEY, -- 오직 정수만 저장
+      name text,
+      price numeric CHECK (price > 0) -- 정수 또는 소수값 저장
+    )
+    ```
+- `EXCLUSION` 제약 조건
+  - 특정 오퍼레이터를 사용한 특정 열이나 식에서 어떤 두 열이 비교될 때 모든 비교 값이 참으로 판명되지 않아야 한다는 조건
+    ```sql
+    CREATE TABLE company (
+      ID INT PRIMARY KEY NOT NULL,
+      NAME TEXT,
+      AGE INT,
+      ADDRESS CHAR(50),
+      SALARY numeric,
+      EXCLUDE USING gist
+      (NAME WITH =,
+      AGE WITH <>)
+    )
+    ```
+    ```sql
+    INSERT INTO COMPANY7 VALUES(1, 'Paul', 32, 'California', 20000.00 );
+    INSERT INTO COMPANY7 VALUES(2, 'Paul', 32, 'Texas', 20000.00 );
+    INSERT INTO COMPANY7 VALUES(3, 'Paul', 42, 'California', 20000.00 );
+    ```
+    ```sql
+    ERROR:  conflicting key value violates exclusion constraint "company7_name_age_excl"
+    DETAIL:  Key (name, age)=(Paul, 42) conflicts with existing key (name, age)=(Paul, 32).
+    ```
+
+### CREATE
+
+#### Syntax
+
+```sql
+CREATE TABLE table_name (
+  column_name TYPE column_constraints,
+  column_name TYPE column_constraints,
+  table_constraints table_constraint
+) INHERITS existing_table_name; 
+```
+
+#### Example
+
+```sql
+CREATE TABLE account(
+	user_id SERIAL PRIMARY KEY,
+	username VARCHAR(50) UNIQUE NOT NULL,
+	password VARCHAR(50) NOT NULL,
+	email VARCHAR(250) UNIQUE NOT NULL,
+	created_on TIMESTAMP NOT NULL,
+	last_login TIMESTAMP
+)
+
+CREATE TABLE job(
+	job_id SERIAL PRIMARY KEY,
+	job_name VARCHAR(200) UNIQUE NOT NULL
+)
+
+CREATE TABLE account_job(
+	user_id INTEGER REFERENCES account(user_id),
+	job_id INTEGER REFERENCES job(job_id),
+	hire_date TIMESTAMP
+)
+```
+
+- `SERIAL`
+  - PostgreSQL에서 sequence는 정수 시퀀스를 생성하는 특수한 종료의 데이터베이스 개체이다.
+  - 스퀀스는 종종 테이블의 PK 컬럼에 이용된다.
+  - 시퀀스가 생성되고 시퀀스에서 생성된 다음 값(next value)를 해당 컬럼의 기본값으로 설정한다.
+  - 삽입(INSERT) 시 자동으로 고유한 정수 항목을 기록하므로 PK에 적합하다.
+  
+### INSERT
+
+`INSERT`는 테이블에 레코드를 추가할 수 있도록 수행한다.
+
+#### Syntax
+
+```sql
+INSERT INTO table (column1, column2, ...)
+VALUES (value1, value2), (value1, value2), ...;
+```
+
+#### Example
+
+```sql
+INSERT INTO account(username, password, email, created_on)
+VALUES ('Jaewon', 'password', 'jaewon@mail.com', CURRENT_TIMESTAMP);
+
+INSERT INTO job(job_name) VALUES ('Web Programmer')
+
+INSERT INTO account_job(user_id, job_id, hire_date)
+VALUES (1, 1, CURRENT_TIMESTAMP)
+```
+
+### UPDATE
+
+- `UPDATE`는 테이블에 있는 컬럼의 값을 수정, 변경할 수 있도록 수행한다.
+
+#### Syntax
+
+```sql
+UPDATE table
+SET column1 = value1, column2 = value2, ...
+WHERE condition;
+```
+
+#### Example
+
+```sql
+UPDATE account
+SET last_login = CURRENT_TIMESTAMP
+WHERE last_login IS NULL;
+```
+
+#### UPDATE JOIN
+
+```sql
+-- 다른 테이블의 값을 사용하여 업데이트할 수 있다.
+UPDATE Table_A
+SET original_col = Table_B.new_col
+FROM Table_B
+WHERE Table_A.id = Table_B.id
+
+UPDATE account_job
+SET hire_date = account.created_on
+FROM account
+WHERE account_job.user_id = account.user_id;
+```
+
+#### 결과값에 영향이 있는 값을 불러오기
+
+```sql
+UPDATE account
+SET last_login = created_on
+RETURNING account_id, last_login
+```
+
+- `UPDATE` 명령을 사용할 때, 결과가 보여지지 않지만 영향을 받은 특정 세로단을 확인하고 싶은 경우 명령할 수 있다.
+
+### DELETE
+
+`DELETE`은 테이블의 레코드를 삭제할 수 있도록 해준다.
+
+```sql
+DELETE FROM table
+WHERE row_id = 1;
+```
+
+### ALTER
+
+- `ALTER`는 현재 테이블 구조를 변경할 수 있도록 해준다.
+  - 컬럼을 추가, 삭제 및 이름을 변경할 수 있다.
+  - 컬럼의 데이터 타입을 변경할 수 있다.
+  - 컬럼의 `CHECK` 제약 조건을 추가할 수 있다.
+  - 컬럼에 대한 `DEFAULT`값을 설정할 수 있다.
+  - 테이블의 이름을 변경할 수 있다.
+
+#### Syntax
+
+```sql
+ALTER TABLE table_name action
+```
+
+#### Renaming Table
+
+```sql
+ALTER TABLE information RENAME TO new_info
+```
+
+#### Adding Columns
+
+```sql
+ALTER TABLE table_name
+ADD COLUMN new_col TYPE
+```
+
+#### Removing Columns
+
+```sql
+ALTER TABLE table_name
+DROP COLUMN col_name
+```
+
+#### Alter constraints
+
+```sql
+ALTER TABLE table_name
+ALTER COLUMN col_name
+SET DEFAULT value -- SET NO NULL, DROP DEFAULT, DROP NOT NULL, ADD CONSTRAINT constraint_name
+```
+
+### DROP
+
+- `DROP`은 테이블의 컬럼을 삭제할 수 있도록 해준다.
+- PostgreSQL에서는 자동적으로 해당 컬럼과 관련된 인덱스 및 제약조건들을 삭제해준다.
+- 그러나 추가 `CASCADE` 절이 없으면 VIEWS, TRIGGERS, 또는 Stored Procedures에 사용되는 열은 삭제되지 않는다.
+
+#### Syntax
+
+```sql
+ALTER TABLE table_name
+DROP COLUMN col_name
+```
+
+#### 모든 종속 관계까지 제거(Remove all dependencies)
+
+```sql
+ALTER TABLE table_name
+DROP COLUMN col_name CASCADE
+```
+
+#### 해당 컬럼 체크 후 삭제
+
+```sql
+ALTER TABLE table_name
+DROP COLUMN IF EXISTS col_name -- 해당 컬럼 없으면 에러가 발생하기 때문에 에러 피하기 위해 작성
+```
+
+#### 여러 컬럼 삭제
+
+```sql
+ALTER TABLE table_name
+DROP COLUMN col_one,
+DROP COLUMN col_two
+```
+
