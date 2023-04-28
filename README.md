@@ -1036,5 +1036,87 @@ SELECT item, (price - COALESCE(discount, 0)) AS final FROM table;
 
 - `COALESCE` 함수는 `NULL`을 포함하는 테이블에 대해 질의문을 작성할 때 유용하다.
   - 만약 해당 값이 `NULL`이면 다른 값으로 대체하도록 만들 수 있다.
-  
+
+### CAST
+
+- `CAST`는 다른 타입으로 변환하기 위해 사용한다.
+- `CAST` 함수 문법
+  - `SELECT CAST('5' AS INTEGER)`
+- PostgreSQL CAST 연산자
+  - `SELECT '5'::INTEGER`
+
+#### Example
+
+```sql
+-- inventory_id -> integer
+SELECT CHAR_LENGTH(CAST(inventory_id AS VARCHAR)) FROM rental;
+
+-- ERROR: function char_length(integer) does not exist
+SELECT CHAR_LENGTH(inventory_id) FROM rantal;
+```
+
+### NULLIF
+
+- `NULLIF` 함수는 2개의 인자를 받고 두 인자가 같은 값이면 `NULL`을 반환하고, 다르다면 첫 번째 인자를 반환한다.
+  - `NULLIF(arg1, arg2)`
+- Example
+  - `NULLIF(10, 10)` --> NULL
+  - `NULLIF(10, 12)` --> 10
+
+#### Example
+
+|Name|Department|
+|---|---|
+|Lauren|A|
+|Vinton|A|
+|Claire|B|
+
+```sql
+-- 2가 나온다.
+SELECT (
+        SUM(CASE WHEN department = 'A' THEN 1 ELSE 0 END) /
+        SUM(CASE WHEN department = 'B' THEN 1 ELSE 0 END)
+) AS department_ratio
+FROM depts
+
+DELETE FROM depts
+WHERE department = 'B'
+
+-- ERROR: division by zero
+SELECT (
+        SUM(CASE WHEN department = 'A' THEN 1 ELSE 0 END) /
+        SUM(CASE WHEN department = 'B' THEN 1 ELSE 0 END)
+) AS department_ratio
+FROM depts
+
+-- 해결
+SELECT (
+        SUM(CASE WHEN department = 'A' THEN 1 ELSE 0 END) /
+        NULLIF(SUM(CASE WHEN department = 'B' THEN 1 ELSE 0 END), 0)
+) AS department_ratio
+FROM depts
+```
+
+## Views
+
+- 종종 프로젝트에 자주 사용하는 테이블과 조건의 특정 조합을 발견하는 경우가 많다.
+- 동일한 쿼리를 반복적으로 수행하는 대신 VIEW를 만들어 간단한 호출로 반복되는 쿼리를 빠르게 조회할 수 있다.
+- VIEW는 저장된 쿼리의 데이터베이스 개체이다.
+- VIEW는 PostgreSQL에서 가상 테이블로서 접근할 수 있다.
+- VIEW는 물리적으로 데이터를 저장하는 것이 아니라 단순히 쿼리만 저장하는 것이다.
+- 따라서 기존의 VIEW를 업데이트하고 변경할 수 있다.
+
+```sql
+CREATE (OR REPLACE) VIEW customer_info AS
+SELECT first_name, last_name, address
+FROM customer
+INNER JOIN address
+ON customer.address_id = address.address_id;
+
+SELECT * FROM customer_info
+
+DROP VIEW IF EXISTS customer_info;
+
+ALTER VIEW customer_info RENAME TO c_info;
+```
 
