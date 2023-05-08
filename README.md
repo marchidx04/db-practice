@@ -111,6 +111,41 @@ SELECT DISTINCT(column) FROM table
   ```
   - `2023-03-31`로 작성하면 `2023-03-31 00:00:00` 이전의 정보들을 가져오기 때문에 `2023-04-01`로 작성해야 한다.
 
+## 비교 연산자 및 기타
+
+### 연산자 우선 순위
+
+1. 괄호()
+2. NOT 연산자
+3. 비교 연산자, SQL 연산자
+4. AND
+5. OR
+
+### 비교 연산자
+
+- `=`, `<>`, `>=`, `>`, `<=`, `<`
+- 모든 자료형에 대해 적용
+- 문자열의 크기 비굔느 사전 순으로 수행됨
+- 예 : '01' < '02' < '1' < '11' < '2'
+- NULL에는 비교 연산자 사용 불가
+  - 따라서 `IS NULL`, `IS NOT NULL`을 사용함
+
+### 논리 연산자
+
+- 모든 자료형에 대해 적용
+- `NOT`, `AND`, `OR` (우선순위: `NOT` > `AND` > `OR`)
+- 다음 SQL문 중 실행 결과가 나머지 두 가지와 다른 것은?
+  ```sql
+  SELECT PLAYER_NAME, POSITION, HEIGHT FROM PLAYER
+  WHERE POSITION <> 'GK' AND HEIGHT > 180;
+
+  SELECT PLAYER_NAME, POSITION, HEIGHT FROM PLAYER
+  WHERE NOT(POSITION = 'GK') AND HEIGHT > 180;
+
+  SELECT PLAYER_NAME, POSITION, HEIGHT FROM PLAYER
+  WHERE NOT(POSITION = 'GK' AND HEIGHT > 180); -- = NOT(POSITION = 'GK') OR NOT(HEIGHT > 180);
+  ```
+
 ### IN
 
 - 특정 경우에는 여러 가능한 값을 확인해야 할 수도 있다.
@@ -152,6 +187,23 @@ SELECT DISTINCT(column) FROM table
   ```
 - PostgreSQL은 `LIKE` 및 `ILIKE` 외에 전체적인 정규표현식 기능을 지원한다.
   - https://www.postgresql.org/docs/12/functions-matching.html
+
+### ROWNUM
+
+- TOP N개의 레코드 반환
+- 사용자가 아닌 시스템이 관리하는 Pseudo Column
+  - 채번, 출력 개수 지정 등에 활용 가능
+- 테이블 내의 UNIQUE한 값 설정에도 사용 가능
+  - ROWNUM을 이용하여 ID 필드 생성
+  - UPDATE 테이블명 SET 칼럼명 = ROWNUM;
+    ```sql
+    ALTER TABLE PLAYER ADD (ROW_ID NUMBER);
+    UPDATE PLAYER SET ROW_ID = ROWNUM;
+
+    SELECT PLAYER+NAME FROM PLAYER WHERE ROW_ID = 3;
+    ```
+    
+
 
 ## GROUP BY와 집계 함수
 
@@ -1119,4 +1171,39 @@ DROP VIEW IF EXISTS customer_info;
 
 ALTER VIEW customer_info RENAME TO c_info;
 ```
+
+## SQL 개요
+
+### SQL(<- SEQUEL)(<- Structured Query Language)
+
+- 관계형 데이터베이스에서 데이터 정의(`DDL`), 조작(`DML`), 제어(`DCL`)를 위해 사용하는 언어
+  - 추가로 `TCL(Transaction Control Language)` 4가지로 구성되어 있다.
+- 표준 SQL: ISO의 표준 규격을 따르는 SQL
+- SQL 기본 작성 규칙
+  - 문장 마지막은 세미콜론(;)으로 끝남
+  - 명령어, 객체명, 변수명은 대/소문자 구분이 없음
+    - **데이터 값은 대/소문자를 구분함**
+  - 날짜와 문자열에는 작은 따옴표를 사용
+    - age = 20
+    - name = 'KIM'
+  - 단어와 단어 사이는 공백 또는 줄바꿈으로 구분
+  - 주석문
+    - `-- 이것은 주석입니다.`
+    - `/* 여기부터 여기까지 주석입니다. */`
+
+### SQL 구문 유형
+
+- 데이터 정의어(DDL: Data Definition Language)
+  - 데이터의 구조(스키마)를 정의하기 위한 명령어
+  - CREATE, ALTER, DROP, RENAME, TRUNCATE
+- 데이터 조작어(DML: Data Manipulation Language)
+  - 데이터를 검색 또는 변형하기 위한 명령어
+  - SELECT, INSERT, UPDATE, DELETE
+- 데이터 제어어(DCL: Data Control Language)
+  - 사용자에게 객체에 대한 권한을 부여/취소하기 위한 명령어
+  - GRANT, REVOKE
+- 트랜잭션 제어어(TCL: Transaction Control Language)
+  - 변경 내용을 확정/취소하기 위한 명령어
+  - COMMIT, ROLLBACK
+
 
