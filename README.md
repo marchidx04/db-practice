@@ -193,6 +193,18 @@ SELECT DISTINCT(column) FROM table
 - TOP N개의 레코드 반환
 - 사용자가 아닌 시스템이 관리하는 Pseudo Column
   - 채번, 출력 개수 지정 등에 활용 가능
+- 한 행만 반환할 때
+  ```sql
+  SELECT PLAYER_NAME FROM PLAYER WHERE ROWNUM = 1;
+  SELECT PLAYER_NAME FROM PLAYER WHERE ROWNUM <= 1;
+  SELECT PLAYER_NAME FROM PLAYER WHERE ROWNUM < 2;
+  ```
+- 여러 행 반환할 때
+  ```sql
+  SELECT PLAYER_NAME FROM PLAYER WHERE ROWNUM = 3; -- 안됨
+  SELECT PLAYER_NAME FROM PLAYER WHERE ROWNUM <= 3;
+  SELECT PLAYER_NAME FROM PLAYER WHERE ROWNUM < 4;
+  ```
 - 테이블 내의 UNIQUE한 값 설정에도 사용 가능
   - ROWNUM을 이용하여 ID 필드 생성
   - UPDATE 테이블명 SET 칼럼명 = ROWNUM;
@@ -202,8 +214,6 @@ SELECT DISTINCT(column) FROM table
 
     SELECT PLAYER+NAME FROM PLAYER WHERE ROW_ID = 3;
     ```
-    
-
 
 ## GROUP BY와 집계 함수
 
@@ -797,6 +807,17 @@ WHERE o.customer_id = c.id;
     ERROR:  conflicting key value violates exclusion constraint "company7_name_age_excl"
     DETAIL:  Key (name, age)=(Paul, 42) conflicts with existing key (name, age)=(Paul, 32).
     ```
+### CASCADE
+
+- 참조 테이블(부모 테이블)의 해당 행(row)이 삭제되거나 업데이트될 떄, 자동적으로 기본 테이블(자식 테이블)에서도 매치되는 행이 똑같이 삭제 또는 업데이트됨
+- 공식 문서는 `CASCADE`를 FOREIN KEY CONSTRAINTS에서 옵션으로 사용할 수 있는 [Referential Actions](https://dev.mysql.com/doc/refman/8.0/en/create-table-foreign-keys.html#foreign-key-referential-actions)라고 설명함
+
+#### ON DELETE CASCADE 설정
+
+- `ON DELETE CASCADE` 옵션을 적용하면 부모 테이블에서 row를 삭제할 경우 연결된 자식 테이블의 row가 함께 삭제된다.
+  - 연결된 데이터를 한 번에 지울 수 있어 데이터의 관리가 편리하고 일관성을 유지할 수 있다는 장점이 있다.
+- 마찬가지로 `ON UPDATE CASCADE`를 설정하면 UPDATE할 때 `CASCADE` 옵션이 적용된다.
+  - 근데 PK 같은 경우는 바뀌면 안되기 때문에(UPDATE가 되면 안됨) 쓸 일이 없다고 봐도 무방하다.
 
 ### CREATE
 
@@ -842,13 +863,19 @@ CREATE TABLE account_job(
   
 ### INSERT
 
-`INSERT`는 테이블에 레코드를 추가할 수 있도록 수행한다.
+- `INSERT`는 테이블에 레코드를 추가할 수 있도록 수행한다.
+- 문자 또는 날짜 값의 경우 작은 따옴표로 묶음
+  - 숫자 데이터는 작은 따옴표 없이 사용
 
 #### Syntax
 
 ```sql
-INSERT INTO table (column1, column2, ...)
-VALUES (value1, value2), (value1, value2), ...;
+-- 일부 칼럼에 대응되는 값만 입력
+INSERT INTO table (column1, column2, ...) -- COLUMN_LIST
+VALUES (value1, value2), (value1, value2), ...; -- VALUE_LIST
+
+-- 전체 칼럼에 대응되는 값을 모두 입력
+INSERT INTO table VALUES (전체 COLUMN의 VALUE_LIST);
 ```
 
 #### Example
@@ -857,10 +884,17 @@ VALUES (value1, value2), (value1, value2), ...;
 INSERT INTO account(username, password, email, created_on)
 VALUES ('Jaewon', 'password', 'jaewon@mail.com', CURRENT_TIMESTAMP);
 
-INSERT INTO job(job_name) VALUES ('Web Programmer')
+INSERT INTO job(job_name) VALUES ('Web Programmer');
 
 INSERT INTO account_job(user_id, job_id, hire_date)
-VALUES (1, 1, CURRENT_TIMESTAMP)
+VALUES (1, 1, CURRENT_TIMESTAMP);
+
+INSERT INTO 
+    links (url, name)
+VALUES
+    ('https://www.google.com','Google'),
+    ('https://www.yahoo.com','Yahoo'),
+    ('https://www.bing.com','Bing');
 ```
 
 ### UPDATE
@@ -1206,4 +1240,37 @@ ALTER VIEW customer_info RENAME TO c_info;
   - 변경 내용을 확정/취소하기 위한 명령어
   - COMMIT, ROLLBACK
 
+## Function
 
+### 단일 행 함수 특징
+
+```sql
+SELECT PLAYER_NAME, LENGTH(PLAYER_NAME) AS 이름길이 FROM PLAYER;
+```
+
+- 각 행(Row)에 대해 개별적으로 작용하고 그 결과를 반환함
+  - 단일 행 내에 있는 하나 또는 복수의 값을 인수로 사용
+  - 여러 행에 걸친 값을 사용할 수 없음
+- 함수 중첩(함수의 인자로 함수를 사용)이 가능함
+- SELECT, WHERE, ORDER BY 절에 사용 가능함
+
+### 단일행 내장 함수
+
+- [문자형 함수](https://www.w3resource.com/PostgreSQL/chr-function.php)
+  - 문자형 변수 처리
+  - LOWER, UPPER, ASCII, CHR, CONCAT, SUBSTR, LENGTH, LTRIM, RTRIM, TRIM, ...
+- [숫자형 함수](https://www.postgresqltutorial.com/postgresql-math-functions)
+  - 숫자형 변수 처리
+  - ABS, MOD, CEIL, FLOOR, ROUND, ...
+- [변환 함수](https://www.postgresql.org/docs/current/functions-formatting.html)
+  - 문자, 숫자, DATE형 값의 타입 변환
+  - CAST, TO_CHAR, TO_NUMBER, TO_DATE, TO_TIMESTAMP
+    - `select to_char(now(), 'HH12:MI:SS'); -- 12:18:52`
+- 날짜형 함수
+  - NOW, EXTRACT, ...
+- 제어 함수
+  - 논리값에 따른 값의 처리
+  - CASE, ...
+- NULL 관련 함수
+  - NULL 처리
+  - COALESCE, NULLIF
