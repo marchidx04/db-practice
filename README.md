@@ -1168,6 +1168,13 @@ FROM film; -- 각 개수 구하는데에도 CASE가 사용될 수 있다.
 
 ```sql
 SELECT item, (price - COALESCE(discount, 0)) AS final FROM table;
+
+-- CASE 구문으로 표현 가능
+SELECT item, (price - 
+        CASE WHEN discount IS NOT NULL THEN discount
+             ELSE 0
+        END) AS final
+FROM table;
 ```
 
 - `COALESCE` 함수는 `NULL`을 포함하는 테이블에 대해 질의문을 작성할 때 유용하다.
@@ -1225,7 +1232,7 @@ SELECT (
 ) AS department_ratio
 FROM depts
 
--- 해결
+-- 해결 -> NULL 값이 있는 산술 연산은 무조건 결과값이 NULL이다.
 SELECT (
         SUM(CASE WHEN department = 'A' THEN 1 ELSE 0 END) /
         NULLIF(SUM(CASE WHEN department = 'B' THEN 1 ELSE 0 END), 0)
