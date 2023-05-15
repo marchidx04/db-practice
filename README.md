@@ -215,6 +215,18 @@ SELECT DISTINCT(column) FROM table
     SELECT PLAYER+NAME FROM PLAYER WHERE ROW_ID = 3;
     ```
 
+#### PostgreSQL에서 ROWNUM 사용하기
+
+```sql
+SELECT *
+FROM (SELECT ROW_NUMBER() OVER(ORDER BY NAME) AS ROWNUM, name FROM users) T
+WHERE ROWNUM % 2 = 0;
+```
+
+- 행 순서를 나타내려면 `ROW_NUMBER() OVER(ORDER BY ...)` 구분을 사용하면 되고, 서브쿼리를 통해 해당 값에 조건을 매길 수 있다.
+- 위는 짝수번째 행만 조회하는 쿼리이다.
+
+
 ## GROUP BY와 집계 함수
 
 > GROUP BY는 데이터를 분류하여 데이터가 어떤 범주에 어떻게 분포되는지를 이해하기 위해 데이터를 집계하는데 사용된다.
@@ -603,6 +615,40 @@ SELECT NOW(); -- 2023-04-26 13:46:12.170282+09 <- 수요일
 select extract('DOW' FROM NOW()); -- 3
 select extract('CENTURY' FROM now()); -- 21
 ```
+
+#### DATE_TRUNC
+
+- `DATE_TRUNC()` 함수는 인수를 사용하여 다양한 날짜, 시간 형식으로 데이터를 자를때 사용한다.
+- `DATE_TRUNC()` 함수에서 사용할 수 있는 인수 목록
+  - millennium
+  - century
+  - decade
+  - year
+  - quarter
+  - month
+  - week
+  - day
+  - hour
+  - minute
+  - second
+  - milliseconds
+  - microseconds
+- 예시
+  ```sql
+  SELECT 
+    DATE_TRUNC('year', NOW()) as year, -- 년 밑으로 자르기
+    DATE_TRUNC('month', NOW()) as month, -- 월 밑으로 자르기
+    DATE_TRUNC('day', NOW()) as day, -- 일 밑으로 자르기
+    DATE_TRUNC('hour', NOW()) as hour, -- 시 밑으로 자르기
+    DATE_TRUNC('minute', NOW()) as minute, -- 분 밑으로 자르기
+    DATE_TRUNC('second', NOW()) as second; -- 초 밑으로 자르기
+
+  SELECT TO_CHAR(DATE_TRUNC('day', NOW()), 'YYYY.MM.DD.HH24.MI.SS'); -- 2023.05.15.00.00.00
+  ```
+
+![image](https://github.com/marchidx04/db-practice/assets/126429401/e5227107-2ec0-413f-b5c6-fbb3e7fdf0c9)
+
+
 #### AGE
 
 - `AGE()`함수는 특정날짜를 지정하면 해당 날짜에서의 나이를 출력한다.
@@ -1036,7 +1082,7 @@ DROP COLUMN col_two
 - `CASE`는 특정 조건을 만날 때 SQL code를 실행시키기 위해 사용한다.
 - 다른 프로그래밍 언어들의 `IF/ELSE`와 비슷하다
 
-#### Syntax
+#### Searched Case Expression
 
 ```sql
 CASE
@@ -1053,7 +1099,9 @@ END                                  |    2     |    two   |
 FROM test;                            ---------------------
 ```
 
-#### Syntax Expression Syntax
+- 다양한 조건 사용 가능
+
+#### Simple Case Expression
 
 ```sql
 CASE expression
@@ -1069,6 +1117,8 @@ SELECT a,
   END
 FROM test;
 ```
+
+- 동등(=) 비교에만 사용 가능
 
 #### CASE Example
 
