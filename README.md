@@ -565,7 +565,6 @@ SELECT column_name(s) FROM Table2
 
 - 테이블과 데이터베이스를 설계하고 시간 데이터 유형을 선택할 때는 신중하게 고려해야 한다.
   - 상황에 따라 전체 `TIMESTAMPTZ` 레벨이 필요하거나 필요하지 않을 수 있다.
-  - 기록 정보는 항상 제거할 수 있지만 추가할 수 없다.
 - 타임존 확인
   - `show timezone;`
 - 타임존 설정(변경)
@@ -614,6 +613,21 @@ SELECT column_name(s) FROM Table2
 SELECT NOW(); -- 2023-04-26 13:46:12.170282+09 <- 수요일
 select extract('DOW' FROM NOW()); -- 3
 select extract('CENTURY' FROM now()); -- 21
+
+select 
+	EXTRACT('CENTURY' FROM NOW()) AS century,
+	EXTRACT('DAY' FROM NOW()) AS day,
+	EXTRACT('DOW' FROM NOW()) AS dow,
+	EXTRACT('DOY' FROM NOW()) AS doy,
+	EXTRACT('EPOCH' FROM NOW()) AS epoch,
+	EXTRACT('HOUR' FROM NOW()) AS hour,
+	EXTRACT('MILLISECOND' FROM NOW()) AS millisecond,
+	EXTRACT('MINUTE' FROM NOW()) AS minute,
+	EXTRACT('MONTH' FROM NOW()) AS month,
+	EXTRACT('QUARTER' FROM NOW()) AS quarter,
+	EXTRACT('SECOND' FROM NOW()) AS second,
+	EXTRACT('WEEK' FROM NOW()) AS week,
+	EXTRACT('YEAR' FROM NOW()) AS year;
 ```
 
 #### DATE_TRUNC
@@ -1158,7 +1172,7 @@ FROM film; -- 각 개수 구하는데에도 CASE가 사용될 수 있다.
 ### COALESCE
 
 - `COALESCE` 함수는 `NULL`이 아닌 첫 번쨰 인수를 반환한다.
-  - `COALESCE` 함수는 인수에 제한이 없다.
+  - `COALESCE` 함수는 인수에 제한이 없다. 
   - 모든 인수가 `NULL`이면 `COALESCE` 함수도 `NULL`을 반환한다.
 - `COALESCE (arg_1, arg_2, ..., arg_n)`
   - `SELECT COALESCE (1, 2)` --> 1
@@ -1331,3 +1345,87 @@ SELECT PLAYER_NAME, LENGTH(PLAYER_NAME) AS 이름길이 FROM PLAYER;
 - NULL 관련 함수
   - NULL 처리
   - COALESCE, NULLIF
+
+## TCL
+
+### 트랜잭션
+
+- 데이터베이스의 논리적 연산 단위
+  - 의미적으로 분할할 수 없는 최소의 단위
+  - 일반적으로 하나의 트랜잭션은 여러 SQL 문장을 포함함
+  - **성공 시 모든 연산을 반영, 취소 시 모든 연산을 취소함 -> All or Nothing**
+- 트랜잭션의 예
+  - 도서 주문
+    - 재고 수량 감소, 주문 내역 생성, 결제, 포인트 적립 => 하나의 트랜잭션
+  - 계좌 이체
+    - 원 계좌의 잔액 감소, 다른 계좌의 잔액 증가 => 하나의 트랜잭션
+    - 이체라는 하나의 행위를 실행하기 위해서는 한 쪽에서 잔액을 감소하고, 다른 한 쪽에서 잔액을 증가시키는 두 연산이 발생한다.
+  - 교통카드 충전
+    - 잔액 증가, 결제 => 하나의 트랜잭션
+
+### 트랜잭션의 특성 (ACID 특성)
+
+|특성|설명|
+|--|--|
+|원자성(Atomicity)|트랜잭션에서 정의된 연산들은 모두 성공적으로 실행되던지 아니면 전혀 실행되지 않은 상태로 남아 있어야 한다.(all or nothing)|
+|일관성(Consistency)|트랜잭션이 실행되기 전의 데이터베이스 내용이 잘못되어 있지 않다면, 트랜잭션이 실행된 이후에도 데이터베이스의 내용에 잘못이 있으면 안된다.|
+|고립성(Isolation)|트랜잭션이 실행되는 도중에 다른 트랜잭션의 영향을 받아서는 안된다.|
+|지속성(Durability)|트랜잭션이 성공적으로 수행되면 그 트랜잭션이 갱신한 데이터베이스의 내용은 영구적으로 저장된다.|
+
+- 지속성
+  - 트랜잭션을 수행하기 위해서는 데이터베이스에 있는 테이블들을 메모리로 가지고 와야한다.
+  - 메모리에서 연산을 모두 수행하고 나서, 문제없이 종료되면 DB에 기록하라는 commit 명령어 실행
+  - 반영되고 난 데이터베이스의 내용은 다른 트랜잭션이 수행되지 않는 한 영구적으로 안바뀐다는 의미.
+
+### 트랜잭션의 ACID 특성을 보장하기 위해 DBMS는 동시성 제어(Concurrency Control) 수행
+
+- DBMS에서는 트랜잭션 관리자 라는 모듈을 따로 둔다. 이 트랜잭션 관리자가 동시성 제어를 수행.
+  - 트랜잭션 따로 따로 수행하기 되면 비효율적이기 때문에 섞여서 수행되는데 섞여도 수행되지만 혼자 따로 따로 고립되어서 수행된 것처럼 보장해 주는 알고리즘이 동시성 제어 알고리즘.
+- Lock 기반, Timestamp 기반
+
+### TCL
+
+- COMMIT 실행 전 상태에서는
+  ```sql
+  UPDATE player SET height = height + 10;
+  ```
+  - 변경된 내용은 메모리에 임시로 저장됨
+  - 현재 사용자는 증가한 HEIGHT 값을 읽을 수 있음
+  - 다른 사용자는 증가 전 HEIGHT 값만 읽을 수 있음
+  - HEIGHT에는 잠금(Locking)이 설정되어 다른 사용자는 값을 변경할 수 없음
+- COMMIT 실행 후
+  ```sql
+  COMMIT;
+  ```
+  - 변경된 내용은 DB에 저장됨
+  - 변경 내용은 모든 다른 사용자가 볼 수 있음
+  - 이전 데이터는 모두 사라짐(별도 로그 보관 시 복구 가능)
+  - 관련된 행에 대한 잠금이 해제되어 모든 사용자가 변경할 수 있음
+- 트랜잭션을 제어하기 위한 명령어
+  - COMMIT: 변경된 내용을 DB에 영구적으로 반영
+  - ROLLBACK:
+    - 기본 - 변경된 내용을 버리고 변경 전 상태(마지막 COMMIT)로 복귀
+    - SAVEPOINT를 지정한 경우, 지정한 저장점까지만 복귀
+    - SAVEPOINT: 부분 복귀를 위해 지정한 저장점
+- 트랜잭션은 SQL문 실행 시 자동 시작, COMMIT/ROLLBACK 실행 시 종료
+- 자동 커밋 / 자동 롤백
+  - DDL 문장 수행 시 DDL 수행 전에 자동으로 커밋(auto commit)
+  - DB를 정상적으로 접속 종료하면 자동 커밋
+  - 애플리케이션의 이상 종료로 DB와의 접속이 단절되었을 때 자동 롤백
+
+### ROLLBACK
+
+![image](https://github.com/marchidx04/db-practice/assets/126429401/de220a76-f0bf-460d-bc7f-c1154ad82aee)
+
+```sql
+COMMIT;
+
+UPDATE player SET height = height + 10;
+DELETE FROM player;
+
+ROLLBACK;
+```
+
+- 변경한 내용이 모두 취소됨
+- 이전 데이터가 다시 재저장됨
+- 관련된 행에 대한 잠금이 해제되어 모든 사용자가 변경할 수 있음
