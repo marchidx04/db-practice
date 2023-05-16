@@ -705,6 +705,7 @@ SELECT UPPER(first_name) || ' ' || UPPER(last_name) AS name FROM customer;
   - 조직(1)과 사원(M) 테이블을 조인하면 결과는 사원 레벨(M)의 집합이 생성된다.
   - M:N 관계의 테이블을 조인하면 MN(= M * N) 레벨의 집합이 결과로서 생성된다.
   - 1:1 관계의 테이블을 조인하면 1(= 1 * 1) 레벨의 집합이 생성된다.
+  - 서브쿼리 레벨과는 상관없이 항상 메인쿼리 레벨로 결과 집합이 생성된다.
 - 서브쿼리는 메인쿼리의 칼럼을 모두 사용할 수 있지만 메인쿼리는 서브쿼리의 칼럼을 사용할 수 없다.
   - 따라서 질의 결과에 서브쿼리 칼럼을 표시해야 한다면 조인 방식으로 변환하거나 함수, 스칼라 서브쿼리(Scalar Subquery) 등을 사용해야 한다.
   - 서브쿼리는 서브쿼리 레벨과는 상관없이 항상 메인쿼리 레벨로 결과 집합이 생성된다.
@@ -1414,6 +1415,8 @@ SELECT PLAYER_NAME, LENGTH(PLAYER_NAME) AS 이름길이 FROM PLAYER;
   - 애플리케이션의 이상 종료로 DB와의 접속이 단절되었을 때 자동 롤백
 
 ### ROLLBACK
+
+- https://www.postgresql.org/docs/current/sql-rollback-to.html
 
 ![image](https://github.com/marchidx04/db-practice/assets/126429401/de220a76-f0bf-460d-bc7f-c1154ad82aee)
 
