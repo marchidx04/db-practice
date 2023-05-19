@@ -349,7 +349,7 @@ WHERE ROWNUM % 2 = 0;
   
   SELECT *
   FROM Table_A, Table_B
-  FROM Table_A.col_match = Table_B.col_match
+  WHERE Table_A.col_match = Table_B.col_match
   ```
   - `INNER JOIN`에서는 테이블의 순서가 중요하지 않다.
   - 또한, `JOIN`에 `INNER` 키워드가 없는 경우 PostgreSQL은 `INNER JOIN`으로 처리한다.
@@ -769,9 +769,19 @@ WHERE rental_date BETWEEN '2023-01-03' AND '2023-01-04')
 
 #### 다중 컬럼(Multi Column) 서브쿼리
 
+```sql
+SELECT team_id, player_name, position, back_no, height
+FROM player
+WHERE (team_id, height) IN (SELECT team_id, MIN(height)
+							FROM   player
+                            GROUP BY team_id)
+ORDER BY team_id, player_name;
+```
+
 - 서브쿼리의 실행 결과로여러 칼럼을 반환한다.
 - 메인쿼리의 조건절에 여러 칼럼을 동시에 비교할 수 있다.
 - 서브쿼리와 메인쿼리에서 비교하고자 하는 칼럼 개수와 칼럼의 위치가 동일해야 한다.
+- 위 쿼리는 소속팀 별로 키가 가장 작은 사람들의 정보를 출력하는 쿼리이지만 꼭 팀별로 한 명씩 출력되는 것이 아니라 팀 별로 MIN(height)를 만족하는 모든 사람들이 출력되는 점을 주의해야 한다.
 
 ### 기타 서브쿼리
 
@@ -1391,8 +1401,8 @@ SELECT PLAYER_NAME, LENGTH(PLAYER_NAME) AS 이름길이 FROM PLAYER;
   UPDATE player SET height = height + 10;
   ```
   - 변경된 내용은 메모리에 임시로 저장됨
-  - 현재 사용자는 증가한 HEIGHT 값을 읽을 수 있음
-  - 다른 사용자는 증가 전 HEIGHT 값만 읽을 수 있음
+  - 현재 사용자는 증가한 HEIGHT 값을 읽을 수 있음(메모리에 저장되어 있어서)
+  - 다른 사용자는 증가 전 HEIGHT 값만 읽을 수 있음(아직 DB에는 반영 X)
   - HEIGHT에는 잠금(Locking)이 설정되어 다른 사용자는 값을 변경할 수 없음
 - COMMIT 실행 후
   ```sql
@@ -1420,6 +1430,11 @@ SELECT PLAYER_NAME, LENGTH(PLAYER_NAME) AS 이름길이 FROM PLAYER;
 
 ![image](https://github.com/marchidx04/db-practice/assets/126429401/de220a76-f0bf-460d-bc7f-c1154ad82aee)
 
+- 위 사진에서 현재 위치에서 ROLLBACK이 일어나면 갈 수 있는 곳은 3가지
+  - 트랜잭션이 시작하는 부분(그냥 ROLLBACK하면 시작 위치가 감)
+  - SAVEPOINT A
+  - SAVEPOINT B
+
 ```sql
 COMMIT;
 
@@ -1432,3 +1447,25 @@ ROLLBACK;
 - 변경한 내용이 모두 취소됨
 - 이전 데이터가 다시 재저장됨
 - 관련된 행에 대한 잠금이 해제되어 모든 사용자가 변경할 수 있음
+
+#### SAVEPOINT
+
+- 미리 지정한 SAVEPOINT까지만 ROLLBACK
+  - 특정 저장점까지 롤백하면 그 이후의 명령과 저장점은 모두 무효가 됨
+- 일부 tool에서는 지원되지 않음
+- 동일 이름으로 여러 저장점 정의시 나중에 정의한 저장점이 유효
+  ```sql
+  ...
+  SAVEPOINT PT1;
+
+  ...
+  SAVEPOINT PT2;
+
+  ...
+  SAVEPOINT PT3;
+
+  ...
+  ROLLBACK TO PT1; -- SAVEPOINT PT1으로 이동 -> 이후 명령은 모두 무효가 됨
+  ```
+
+
