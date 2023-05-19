@@ -1468,4 +1468,31 @@ ROLLBACK;
   ROLLBACK TO PT1; -- SAVEPOINT PT1으로 이동 -> 이후 명령은 모두 무효가 됨
   ```
 
+## != NULL, <> NULL, IS NOT NULL 차이
 
+### !=, <>, IS NOT 차이
+
+- 의미상으로는 같지 않다를 나타내어 모두 동일한 결과를 반환할 것이라고 생각할 수 있다.
+- 하지만,,
+  - !=, <>, IS NOT에는 타입 비교 대상의 범위 차이가 있다.
+  - != 와 <> 연산자는 동일한 기능을 하며 원시 타입(Primitive Type)에 대해서만 동작하고,
+  - IS NOT NULL은 모든 타입에 대해 동작한다.
+
+### !=, <>, IS NOT NULL 예시
+ 
+#### != NULL을 사용한 경우
+
+![image](https://github.com/marchidx04/db-practice/assets/126429401/13bdb082-9def-4eca-8f81-3b5f96eb79bf)
+
+  - != NULL을 사용한 경우에는 출력한 레코드가 없는 것을 확인할 수 있다.
+
+#### IS NOT NULL을 사용한 경우
+
+![image](https://github.com/marchidx04/db-practice/assets/126429401/1eb5c365-8545-463f-9297-d3e09b4ce1bf)
+
+  - IS NOT NULL을 사용한 경우에는 delv_msg 컬럼이 NULL인 아닌 레코드들을 반환한 것을 확인할 수 있다.
+
+### 결론
+
+- 결론은 NULL이 아닌지를 비교하려면 무조건 IS NOT NULL 조건식을 사용해야 한다!
+- 그리고 NULL이 아닌 값(varchar, int 등)을 비교하려면 !=, <>를 사용하자.
