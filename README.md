@@ -549,7 +549,23 @@ ON Table_A.col_match = Table_B.col_match
 WHERE Table_A.is IS NULL
 ```
 
-### UNIONS
+## 집합 연산자
+
+- 여러 질의(Select 문) 결과를 하나로 결합하기 위해 사용
+- 집합 연산의 대상이 되는 두 질의는...
+  - SELECt 절의 컬럼 수가 동일해야 하고,
+  - SELECT 절의 동일 위치에 존재하는 칼럼의 데이터 타입이 상호 호환 가능해야 한다.
+
+### 집합 연산자 종류
+
+|집합 연산자|연산자 의미|
+|---|---|
+|UNION|여러 SQL문의 결과에 대한 합집합(중복된 행은 제거한 후 하나의 행만 출력)|
+|UNION ALL|여러 SQL문의 결과에 대한 합집합(중복된 행도 삭제하지 않고 모두 출력 -> 속도가 빠르므로 우선 고려)|
+|INTERSECT|여러 SQL문의 결과에 대한 교집합(중복된 행은 제거한 후 하나의 행만 출력)|
+|EXCEPT|앞의 SQL문의 결과에서 뒤의 SQL문의 결과를 뺀 차집합(중복된 행은 제거한 후 하나의 행만 출력)|
+
+### UNION
 
 ```
 SELECT column_name(s) FROM Table1
@@ -560,6 +576,44 @@ SELECT column_name(s) FROM Table2
 - `UNION` 연산자를 사용하면 2개 이상의 SELECT 문의 결과 세트를 결합할 수 있다.
 - `JOIN`과 `UNION`의 차이는 `UNION`은 두 결과를 직접 붙인 것이다.
 - 두 `SELECT` 문의 결과를 서로의 바로 위에 붙여준다.
+
+### INTERSECT
+
+```sql
+SELECT team_id, player_name, postion
+FROM player
+WHERE team_id = 'K06'
+INTERSECT
+SELECT team_id, player_name, postion
+FROM player
+WHERE position = 'GK';
+
+-- INTERSECT 연산자는 IN 서브쿼리, EXISTS 서브쿼리로도 표현 가능하다.
+SELECT team_id, player_name, postion
+FROM player
+WHERE team_id = 'K06' AND position = 'GK';
+```
+
+### EXCEPT
+
+```sql
+SELECT team_id, player_name, postion
+FROM player
+WHERE team_id = 'K06'
+EXCEPT
+SELECT team_id, player_name, postion
+FROM player
+WHERE postion = 'MF';
+
+SELECT team_id, player_name, postion
+FROM player
+WHERE team_id = 'K06' AND position <> 'MF';
+
+SELECT team_id, player_name, postion
+FROM player
+WHERE team_id = 'K06'
+AND postion NOT IN (SELECT position FROM player WHERE postion = 'MF');
+```
 
 ## Timestamps and Extract
 
