@@ -1550,3 +1550,120 @@ ROLLBACK;
 
 - 결론은 NULL이 아닌지를 비교하려면 무조건 IS NOT NULL 조건식을 사용해야 한다!
 - 그리고 NULL이 아닌 값(varchar, int 등)을 비교하려면 !=, <>를 사용하자.
+
+## 고급 집계 함수
+
+### ROLLUP
+
+```sql
+select category, gubun1, count(*)
+from selling_products
+group by rollup(category, gubun1)
+order by category, gubun1;
+```
+
+- 소그룹 별 소계 계산 추가 (순서 중요)
+  - 각 category, gubun1 별 집계
+  - 각 category 별 집계
+  - 전체 집계
+
+#### GOUPING 함수 사용
+
+```sql
+select category, grouping(category), gubun1, grouping(gubun1), count(*)
+from selling_products
+group by rollup(category, gubun1)
+order by category, gubun1;
+```
+
+- GROUPING(컬럼)
+  - 컬럼을 모두 합쳐서 집계를 하면 1, 아니면 0
+  - 즉, 집계에 포함된 것이 아니면 1, 포함된 경우면 0
+  - 어디까지 집계된 것인지 알려주는 용도로 사용됨
+
+#### GROUPING + CASE 사용
+
+```sql
+select
+  case grouping(category)
+    when 1 then 'All Category'
+    else category
+  end as category,
+  case grouping(gubun1)
+    when 1 then 'All gubun1'
+    else gubun1
+  end as gubun1,
+  count(*)
+from selling_products
+group by rollup(category, gubun1)
+order by category, gubun1;
+```
+
+### CUBE
+
+- 다차원 소계 계산 추가 (순서 무관)
+- 모든 조합의 집계 계산 -> 시스템 부하가 크다.
+
+```sql
+select category, gubun1, count(*)
+from selling_products
+group by cube(category, gubun1)
+order by category, gubun1;
+
+select category, gubun1, count(*)
+from selling_products
+group by cube(gubun1, category)
+order by category, gubun1;
+
+-- ROLLUP과 UNION을 사용하여 구현할 수도 있음
+select category, gubun1, count(*)
+from selling_products
+group by rollup(category, gubun1)
+order by category, gubun1;
+
+UNION -- UNION ALL을 하면 겹치는 부분이 두 번 반환된다.
+
+select category, gubun1, count(*)
+from selling_products
+group by rollup(gubun1, category)
+order by category, gubun1;
+```
+
+#### GROUPING SETS
+
+- 여러 컬럼 각각에 대해 반복적으로 그룹화
+
+```sql
+-- category로만 집계, gubun1로만 집계한 레코드를 반환
+select category, gubun1, count(*)
+from selling_products
+group by grouping sets(gubun1, category);
+```
+
+### COALESCE + GROUPING SETS
+
+```sql
+select
+ 	coalesce(category, 'All Category'),
+	coalesce(gubun1, 'All Gubun1'),
+	count(*)
+from selling_products
+group by grouping sets(gubun1, category);
+```
+
+- NULL 값을 채울 수 있음
+
+### GROUP BY와 UNION ALL
+
+```sql
+-- GROUP BY와 UNION ALL을 사용하여 GROUPING SETS 구현 가능
+select 'All Category' as category, gubun1, count(*)
+from selling_products
+group by gubun1
+
+union all
+
+select category, 'All Gubun1' as gubun1, count(*)
+from selling_products
+group by category;
+```
