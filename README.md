@@ -1667,3 +1667,66 @@ select category, 'All Gubun1' as gubun1, count(*)
 from selling_products
 group by category;
 ```
+
+## 윈도우 함수
+
+- 기존 관계형 DB는 커럼간 연산은 쉽지만 행간의 연산은 어렵다.
+- 행 간의 관계 정의를 위해 윈도우 함수가 고안되었다.
+  - ex: 각 직원이 속한 부서 내에서 급여 순위는?
+- 중첩(Nested) 사용 불가
+- 서브쿼리에서도 사용 가능
+- 종류
+  - 순위: RANK, DENSE_RANK
+  - 집계: SUM, MAX, MIN, AVG, COUNT
+    - 현재 나의위치(값)과 연계해서 집계를 하기 때문에 일반 집계함수와는 조금 다르다.
+  - 행 순서: FIRST_VAVLUE, LAST_VALUE, LAG, LEAD
+  - 비율: RATIO_TO_REPORT, PERCENT_RANK, NTILE
+  - 통계: CORR, STDDEV, VARIANCE 등
+
+### 윈도우 함수
+
+```sql
+SELECT WINDOW_FUNCTION (ARGUMENTS) OVER ([PARTITION BY 컬럼] [ORDER BY 컬럼] [WINDOWNIG 절])
+FROM table_name;
+```
+
+- WINDOW_FUNCTION: 기존 함수 or WINDOW 함수로 추가된 함수
+- ARGUMENTS (인수): 함수에 따라 0 ~ N개의 인수 지정
+- `PARTITION BY` 절: 전체 집합을 기준에 의해 소그룹으로 나눌 수 있음
+- ORDER BY 절: 순서를 지정할 기준 항목
+- WINDOWING 절: 함수의 대상이 되는 행 기준의 범위를 지정
+  - `ROWS / RANGE` 중 하나를 선택하여 사용
+    - `ROWS`: 행의 수를 기준으로 한 범위
+    - `RANGE`: 값을 기준으로 한 범위
+    - 자기를 기준으로 위 아래를 찾아볼 수 있는데 행의 수/값을 기준으로 범위를 지정할 수 있다.
+
+#### WINDOWING 절의 사용 예
+
+```sql
+-- 해당 파티션 내에서 앞의 한 행, 현재 행, 뒤의 한 행을 범위로 지정 => 총 3개의 레코드 반환
+ROWS BETWEEN 1 PRECEDNIG AND 1 FOLLOWING
+
+-- 해당 파티션 내에서 (현재 행의 값 - 50) ~ (현재 행의 값 + 150)을 범위로 지정
+RANGE BETWEEN 50 PRECEDING AND 150 FOLLOWING
+
+-- 현재 파티션의 첫 행부터 현재 행까지 지정
+RANGE UNBOUNDED PRECEDING
+```
+
+### RANK 함수
+
+- 동일한 값에는 동일한 순위 부여
+- 동일한 순위를 여러 건으로 취급
+  - ex: 1등이 2명인 경우 -> 1등, 1등, 3등
+
+#### 전체 급여 순위, JOB 내에서 급여 순위 출력
+
+```sql
+SELECT job, ename, sal
+      RANK() OVER (ORDER BY sal DESC) AS ALL_RANK,
+      RANK() OVER (PARTITION BY job ORDER BY sal DESC) AS JOB_RANK
+FROM emp;
+```
+
+![image](https://github.com/MarchIDX/march_erp/assets/126429401/5dc74e76-0c3b-4eef-8047-2c6ff9e9af12)
+
