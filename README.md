@@ -1723,10 +1723,89 @@ RANGE UNBOUNDED PRECEDING
 
 ```sql
 SELECT job, ename, sal
-      RANK() OVER (ORDER BY sal DESC) AS ALL_RANK,
-      RANK() OVER (PARTITION BY job ORDER BY sal DESC) AS JOB_RANK
+      RANK() OVER (ORDER BY sal DESC) AS ALL_RANK, -- 전체 급여 순위
+      RANK() OVER (PARTITION BY job ORDER BY sal DESC) AS JOB_RANK -- 같은 직무를 가진 사람 중에 내 sal의 순위
 FROM emp;
 ```
 
 ![image](https://github.com/MarchIDX/march_erp/assets/126429401/5dc74e76-0c3b-4eef-8047-2c6ff9e9af12)
+
+#### RANK, DENSE_RANK, ROW_NUMBER 비교
+
+- `RANK`
+  - 동일값에 동일 순위 비교
+  - 동일 순위를 여러 건으로 취급(1등, 1등, 3등, ...)
+- `DENSE_RANK`
+  - 동일값에 동일 순위 부여
+  - 동일 순위를 한 건으로 취급(1등, 1등, 2등, ...)
+- `ROW_NUMBER`
+  - 동일값에 다른 순위 부여(1등, 2등, 3등)
+
+```sql
+SELECT job, ename, sal
+      RANK() OVER (ORDER BY sal DESC) AS ALL_RANK, -- 전체 급여 순위
+      DENSE_RANK() OVER (ORDER BY sal DESC) AS DENSE_RANK, -- 전체 급여 순위
+      ROW_NUMBER() OVER (ORDER BY sal DESC) AS ROW_NUMBER, -- 전체 급여 순위
+FROM emp;
+```
+
+![image](https://github.com/MarchIDX/march_erp/assets/126429401/1fde7e32-4851-4674-879e-54884e63e955)
+
+### 집계 윈도우 함수
+
+#### MAX / MIN
+
+- 각 직원이 속한 직업 내에서 급여의 최대값을 함께 출력하기 위한 질의
+
+```sql
+SELECT job, ename, sal,
+      MAX(sal) OVER (PARTITION BY job) AS job_max,
+FROM emp
+ORDER BY job, ename;
+```
+
+![image](https://github.com/MarchIDX/march_erp/assets/126429401/48e0768a-7a97-4ca4-bfab-0a2c48c92943)
+
+#### SUM / AVG
+
+- 각 직업 내에서, 본인보다 높은 급여를 받는 직원의 급여 총합(본인 포함)
+
+```sql
+SELECT job, ename, sal,
+      -- 값이 동일한 경우 동시에 반영
+      SUM(sal) OVER (PARTITION BY job ORDER BY sal DESC RANGE UNBOUNDED PRECEDING)
+FROM emp;
+```
+
+- `RANGE UNBOUNDED PRECEDING)`
+  - 해당 파티션의 맨 처음 로우부터 자신까지
+
+![image](https://github.com/MarchIDX/march_erp/assets/126429401/ebaed8d8-3f6a-4a33-ac05-9d10c6618959)
+
+- JOB이 ANALYST인 경우네는 SAL의 값이 같기 때문에 동시에 반영된 것을 확인할 수 있다.
+- SALESMANE의 경우도 3100에서 1250을 더하는 것이 아니라 2500을 더한 것을 확인할 수 있다.
+
+#### SUM / AVG (Cont'd)
+
+- 각 직업 내에서, 본인 바로 위 + 본인 + 본인 바로 아래의 급여 합 출력
+
+```sql
+SELECT job, ename, sal,
+      SUM(sal) OVER (PARTITION BY job ORDER BY sal ASC ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING)
+FROM emp;
+```
+
+![image](https://github.com/MarchIDX/march_erp/assets/126429401/1e1d01a7-e540-4a25-be77-b755d7ad2ba7)
+
+#### COUNT
+
+- 본인보다 급여가 100 적은 직원부터 200 많은 직원까지의 총 직원 수
+
+```sql
+SELECT ename, sal,
+      COUNT(*) OVER (ORDER BY sal RANGE BETWEEN 100 PRECEDING AND 200 FOLLOWING) AS mov_count
+FROM emp;
+```
+
+![image](https://github.com/MarchIDX/march_erp/assets/126429401/5924a155-c0a6-40fa-a65b-cf82edd155c5)
 
