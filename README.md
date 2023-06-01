@@ -1809,3 +1809,96 @@ FROM emp;
 
 ![image](https://github.com/MarchIDX/march_erp/assets/126429401/5924a155-c0a6-40fa-a65b-cf82edd155c5)
 
+### FIRST_VALUE (or LAST_VALUE)
+
+- 각 파티션에서 가장 먼저 (또는 나중에) 나온 값
+
+```sql
+SELECT deptno, ename, sal, FIRST_VALUE(ename) OVER
+  (PARTITION BY deptno ORDER BY sal DESC, ename ASC) AS rich_emp -- deptno 기준 sal이 많고, ename이 먼저인 값
+FROM emp;
+```
+
+![image](https://github.com/MarchIDX/march_erp/assets/126429401/5629dcea-8d67-4bef-96ba-279f149b8934)\
+
+### 행 순서 윈도우 함수
+
+#### LAG (or LEAD)
+
+- 각 파티션에서 해당 행의 몇 번째 이전 (또는 이후) 행의 값을 가져옴
+- `job = 'SALESMAN'`인 모든 직원에 대해서, 급여 기준 본인 바로 윗 사람의 급여와 아랫 사람의 급여를 출력하는 질의를 완성하시오.
+  - `LAG(sal, 1) = LAG(sal)` / `LEAD(sal, 1) = LEAD(sal)`
+
+```sql
+SELECT ename, sal,
+  LAG(sal, 1) OVER(ORDER BY sal DESC) AS higher_sal,
+  LEAD(sal, 1) OVER(ORDER BY sal DESC) AS lower_sal
+FROM emp
+WHERE job = 'SALESMAN';
+```
+
+![image](https://github.com/MarchIDX/march_erp/assets/126429401/498ff57c-05db-4dbe-aab8-dc7890fc60dd)
+
+#### LAG (or LEAD) 함수 (Cont'd)
+
+- `LAG(sal, 2, 0)`
+  - 2번째 앞의 행을 가져오고, 가져올 행이 없는 처음 두 행의 값은 0으로 채움
+    - `0`을 생략하면 해당 두 행은 NULL로 표시됨
+  - ex: 급여 기준 본인보다 2칸 위 직원의 급여를 출력하시오.
+    ```sql
+    SELECT ename, sal,
+      LAG(sal, 2, 0) OVER (ORDER BY sal DESC) AS higher_sal -- 가져올 행이 없으면 0으로 채움
+    FROM emp;
+    ```
+
+![image](https://github.com/MarchIDX/march_erp/assets/126429401/78eefb13-3ae7-4f28-98e1-3b608c025a3a)
+  
+### 비율 윈도우 함수
+
+#### RATIO_TO_REPORT 함수
+
+- 파티션 내 전체 SUM(컬럼) 값에 대한 행별 백분율(`양`에 대한 비율)
+
+```sql
+-- 동일 JOB 내에서, 본인의 급여가 차지하는 비율 출력
+SELECT job, ename, sal,
+  ROUND(RATIO_TO_REPORT(sal) OVER (PARTITION BY job), 2) AS r_r
+FROM emp
+ORDER BY job;
+```
+
+![image](https://github.com/MarchIDX/march_erp/assets/126429401/ed1c1d39-a057-4da5-8f39-1a779918fe01)
+
+#### PERCENT_RANK 함수
+
+- 행의 순서별 백분율을 구함
+  - 가장 먼저 나온 행 = 0, 가장 나중에 나온 행 = 1
+
+```sql
+-- 동일 JOB 내에서, 본인의 급여가 상위 몇 %에 있는지 출력
+SELECT deptno, ename, sal,
+      100*(PERCENT_RANK() OVER (PARTITION BY deptno ORDER BY sal DESC)) || '%' AS p_r
+FROM emp;
+```
+
+- `deptno = 20`의 경우 총 5건
+  - 0, 0.25, 0.5, 0.75, 1
+  - 동일 값은 작은 백분율(0%가 두개, 60%가 두개)을 중복 적용
+
+#### CUME_DIST 함수
+
+- 현재 행에 대해, 현재 행보다 작거나 같은 건수에 대한 누적 백분율
+  - 0 초과, 1 이하의 값을 가짐
+
+```sql
+-- 동일 JOB 내에서, 본인의 급여가 누적 순서 몇 %에 있는지 출력
+SELECT deptno, ename, sal,
+      100*(CUME_DIST() OVER (PARTITION BY deptno ORDER BY sal DESC)) || '%' AS cume
+FROM emp;
+```
+
+![image](https://github.com/MarchIDX/march_erp/assets/126429401/c42f509a-567b-4f91-b4c2-2b4d2b2a9055)
+
+- `deptno = 20`의 경우 총 5건
+  - 0.2, 0.4, 0.6, 0.8, 1
+  - 동일값은 큰 백분율(20%가 아닌 40%가 두개)을 중복 적용
