@@ -1902,3 +1902,17 @@ FROM emp;
 - `deptno = 20`의 경우 총 5건
   - 0.2, 0.4, 0.6, 0.8, 1
   - 동일값은 큰 백분율(20%가 아닌 40%가 두개)을 중복 적용
+
+#### NTILE 함수
+
+- 파티션별 전체 건수를 N등분한 결과를 구함
+
+```sql
+-- 전체 사원을 급여 순으로 정렬하고, 급여 기준 4개의 그룹으로 분리하는 질의를 작성
+SELECT ename, sal, NTILE(4) OVER (ORDER BY sal DESC) AS 급여구간
+FROM emp;
+```
+
+![image](https://github.com/MarchIDX/march_erp/assets/126429401/aa4b2ff0-7c2e-4c98-9f97-b29fa3675650)
+
+- N 구간으로 나누어서 자기가 급여 기준 몇 그룹에 있는지 확인 가능하다.
