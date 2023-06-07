@@ -1916,3 +1916,179 @@ FROM emp;
 ![image](https://github.com/MarchIDX/march_erp/assets/126429401/aa4b2ff0-7c2e-4c98-9f97-b29fa3675650)
 
 - N 구간으로 나누어서 자기가 급여 기준 몇 그룹에 있는지 확인 가능하다.
+
+## PL / SQL
+
+### 절차형 SQL (PL/SQL)
+
+- PL(Procedural Language)/SQL 개념 및 특징
+  - SQL에서도 절차적인 프로그래밍이 가능하도록 지원
+    - SQL문의 반복 실행, 조건에 따른 분기 등 가능
+  - Block 구조로 설계되어 각 기능별 모듈화 가능
+    - 여러 SQL 문장을 Block으로 묶어서 한 번에 서버로 보냄 -> 통신량 감소
+  - 변수, 상수 등을 선언하여 SQL 문장 간 값 교환 가능
+  - DBMS 정의 에러, 사용자 정의 에러 사용 가능
+- PL/SQL 유형
+  - Procedure
+  - User Defined Function
+  - Trigger
+   
+### PL/SQL Block 구조
+
+![image](https://github.com/MarchIDX/march_erp/assets/126429401/ae5a5856-ac59-4415-b5a0-385cd38eda6b)
+
+- Header에 기본적인 정보가 담김
+- Declaration Section - 선언 구간
+  - `IN`, `OUT` 외에 임시적으로 사용할 변수 선언
+- Execution Section - 연산을 수행하는 구간
+- Exception Section - 예외 처리 구간
+
+### Procedure
+
+- `CREATE Procedure`
+  - `CREATE OR REPLACE` 사용 시 동일 이름의 Procedure를 덮어씀
+  - 삭제 시 `DROP Procedure`
+- `Mode`
+  - `IN`: 운영체제에서 프로시저로 전달하는 변수
+  - `OUT`: 프로시저에서 운영체제로 전달되는 변수
+  - `INOUT`: 거의 사용하지 않음
+- `/`
+  - 프로시저 컴파일 시작
+
+```sql
+CREATE [OR REPLACE] Procedure [Procedure_name]
+(argument1 [mode] data_type1, argument2 [mode] data_type2, ...)
+IS ...
+BEGIN ...
+    EXCEPTION ...
+END;
+/
+```
+
+### Procedure 생성 예
+
+![image](https://github.com/MarchIDX/march_erp/assets/126429401/0e5bd738-9095-4e6c-9d5c-9ffb4728b1c3)
+
+- DEPT 테이블에 새로운 부서를 등록하는 Procedure
+  - 부서가 존재하는 경우 -> 이미 데이터가 존재합니다 반환
+  - 부서가 없는 경우 -> 부서데이터 입력
+  - 그동안 바로 INSERT를 했던거와 달리 확인할 수 있음
+
+```sql
+-- ORACLE
+CREATE OR REPLACE PROCEDURE p_dept_insert
+(v_deptno IN NUMBER, v_dname IN VARCHAR2, v_loc IN VARCHAR2, v_result OUT VARCHAR2)
+
+IS
+    cnt NUMBER := 0;
+BEGIN
+    SELECT COUNT(*) INTO cnt -- cnt 변수에 할당
+    FROM dept
+    WHERE deptno = v_deptno;
+    if cnt > 9 then
+      v_result := '이미 등록된 부서번호이다.';
+    else
+      INSERT INTO dept (deptno, dname, loc) VALUES (v_deptno, v_dname, v_loc);
+      COMMIT;
+      v_result := '입력 완료!!';
+    end if;
+EXCEPTION
+  WHEN OTHERS THEN
+    ROLLBACK;
+    v_result := 'ERROR 발생';
+END;
+/ 
+```
+
+### Procedure 실행 예
+
+- 10번 부서가 이미 등록되어 있는 경우
+
+```sql
+variable rslt varchar2(30);
+
+EXECUTE p_dept_insert(10, 'dev', 'seoul', :rslt);
+print rslt;
+
+RSLT -- 이미 등록된 부서번호이다.
+
+EXECUTE p_dept_insert(50, 'dev', 'seoul', :rslt);
+print rslt;
+
+RSLT; -- 입력 완료!
+```
+
+### 사용자 정의 함수(User Defined Function)
+
+- Procedure처럼 절차형 SQL을 로직과 함께 저장한 명령문의 집합
+  - cf) 내장 함수(Built-in Function) - 벤더에 의해 정의된 함수
+- Procedure와 달리 반드시 **수행 결과값을 Return**해야 함
+  - ex) 절대값을 반환하는 사용자 정의 함수 UTIL_ABS의 정의 및 호출 예
+
+```sql
+CREATE OR REPLACE FUNCTION
+    util_abs (v_input IN NUMBER) RETURN NUMBER
+IS
+    v_return NUMBER := 0;
+BEGIN
+    IF v_input < 0 THEN
+        v_return := v_input * (-1);
+    ELSE
+        v_return := v_input;
+    END IF;
+RETURN v_return;
+END:
+/
+```
+
+### 트리거(Trigger)
+
+- DML문 수행 시, 이와 연결된 동작을 자동으로 수행하도록 작성된 프로그램
+- 사용자가 명시적으로 호출하지 않으며, 조건이 맞으면 자동으로 수행됨
+  - Procedure: Execute 명령어로 실행
+  - Function: 함수 이름으로 실행
+  - Trigger: 생성된 후 DML에 의해 자동으로 실행
+- 주로 데이터 무결성 보장을 위해 FK처럼 동작하거나, 실시간 집계성 테이블 생성에 사용됨
+- 보안 적용, 유효하지 않은 트랜잭션 예방, 업무 규칙 적용, 감사 제공 등에도 사용
+- OLTP 시스템에서는 부하로 인해 성능이 저하될 수 있음
+- ROLLBACK 시, 원 트랜잭션 뿐 아니라 Trigger에 의해 실행된 연산도 모두 취소됨
+  - Trigger는 INSERT, DELETE, UPDATE문과 연결된 하나의 트랜잭션 내에서 수행되는 작업으로 이해해야 함
+    - Procedure: Begin ~ End 사이에 COMMIT, ROLLBACK 사용 가능
+    - Trigger: Begin ~ End 사이에 COMMIT, ROLLBACK 사용 불가
+  - Row Trigger와 Statement Trigger로 구분
+
+### 트리거(Trigger) 주요 구문
+
+- **FOR EACH ROW**
+  - Row Trigger / Statement Trigger의 지정을 위한 구문
+  - `FOR EACH ROW` 사용 -> Row Level Trigger -> SQL 문장의 각 행마다 Trigger 발생
+  - `FOR EACH ROW` 생략 -> Statement Level Trigger -> SQL 한 문장에 한 번만 Trigger 발생
+- **AFTER/BEFORE**
+  - Trigger 수행 시점 명시
+- **:NEW/:OLD**
+  - `:NEW`는 문잣 수행 후의 정보를 갖는 구조체
+    - ex) o_prod = :NEW.product
+  - `:OLD`는 문장 수행 전의 정보를 갖는 구조체
+  |구분|:OLD|:NEW|
+  |---|---|---|
+  |INSERT|NULL|입력된 레코드 값|
+  |UPDATE|UPDATE되기 전의 레코드의 값|UPDATE된 후의 레코드 값|
+  |DELETE|레코드가 삭제되기 전 값|NULL|
+- **변수 선언**
+  - ORDER.order_date%TYPE;
+    - ORDER 테이블의 order_date 컬럼과 동일한 타입으로 선언
+
+### 트리거 생성 예
+
+- 새로운 주문이 입력되면 판매 집계 테이블이 업데이트되는 시나리오
+- 주문 관리 테이블
+  - ORDER: ORDER_DATE, PRODUCT, QTY, AMOUNT
+- 판매 실적 관리 테이블
+  - SALES: SALE_DATE, PRODUCT, QTY, AMOUNT
+- 새로운 주문 입력 시
+  - ORDER 테이블에 새로운 주문 추가
+  - SALES 테이블 갱신 또는 추가
+    - SALES에 해당 주문일자, 해당 상품이 있으면 -> 기존 수량/금액 업데이트
+    - 예: (2023-06-01, "P01", 5, 250,000) -> (2023-06-01, "P01", 6, 300,000)
+    - SALES에 해당 주문일자, 해당 상품이 없으면 -> 새 레코드 추가
+    
