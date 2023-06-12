@@ -2086,9 +2086,273 @@ END:
 - 판매 실적 관리 테이블
   - SALES: SALE_DATE, PRODUCT, QTY, AMOUNT
 - 새로운 주문 입력 시
-  - ORDER 테이블에 새로운 주문 추가
-  - SALES 테이블 갱신 또는 추가
+  - ORDER 테이블에 새로운 주문 추가 -> `Trigger` -> SALES 테이블 갱신 또는 추가
     - SALES에 해당 주문일자, 해당 상품이 있으면 -> 기존 수량/금액 업데이트
     - 예: (2023-06-01, "P01", 5, 250,000) -> (2023-06-01, "P01", 6, 300,000)
     - SALES에 해당 주문일자, 해당 상품이 없으면 -> 새 레코드 추가
     
+```sql
+CREATE OR REPLACE TRIGGER summary_sales
+  AFTER INSERT
+  ON ORDER
+  FOR EACH ROW
+
+DECLARE
+  o_date order.order_date%TYPE;
+  o_prod order.product%TYPE;
+
+BEGIN
+  o_date = :NEW.order_date;
+  o_prod = :NEW.product;
+  UPDATE sales SET qty = qty + :NEW.qty, amount = amount + :NEW.amount; -- amount는 sales 테이블의 amount, :NEW.amount는 order 테이블의 INSERT 후의 amount
+  WHERE sales_date = o_date AND product = o_prod;
+
+  IF SQL%NOTFOUND THEN
+    INSERT INTO sales VALUES (o_date, o_prod, :NEW.qty, :NEW.amount);
+  END iF;
+END;
+/
+```
+
+## SQL 최적화
+
+### 주요 내용
+
+- 옵티마이저와 실행 계획
+  - 규칙기반 옵티마이저
+  - 비용기반 옵티마이저
+- 인덱스 기본
+  - B-Tree 인덱스
+  - Index Scan / Full Scan
+- 조인 수행 원리
+  - NL Join
+  - Sort Merge Join
+  - Hash Join
+  - 조인을 어떻게 찾을지에 대한 이슈
+- 성능 모델링하고는 다르고 SQL 문을 명령할 때 어떻게 해야 더 효율적으로 실행시킬 수 있을지에 초점
+
+### 옵티마이저와 실행 계획
+
+#### 옵티마이저(Optimizer) 개념
+
+- SQL은 사용자의 요구사항만 기술할 뿐 처리 과정은 기술하지 않음
+  - 실제로 SQL문을 실행하기 전에 최적의 실행계획을 찾아야 함
+- 옵티마이저: 사용자의 요구사항을 만족하는 다양한 실행계획(Execution Plan) 중 최적의 실행계획을 결정
+  - SQL을 어떤 순서로 어떻게 실행할지 결정하는 작업 수행
+
+#### 옵티마이저의 종류
+
+- 규칙기반 옵티마이저(RBO: Rule-Based Optimizer)
+  - 거의 사용하지 않지만, 하위 버전 호환성을 위해 유지
+- 비용기반 옵티마이저(CBO: Cost-Based Optimizer)
+
+### 옵티마이저 동작 구조
+
+![image](https://github.com/MarchIDX/march_erp/assets/126429401/44495273-5881-4b15-b014-eece6d4ebe32)
+
+- 사용자가 SQL을 입력하면 파서가 해석(* 바로 실행하는 것이 아니라 어떻게 실행할지를 먼저 고민)
+- 옵티마이저에서 최적의 실행계획을 찾는 과정을 한다.
+  - 규칙 기반 옵티마이저는 규칙이 이미 다 정의가 되어 있는 상태에서 계산을 통해 바로 실행계획이 나온다.
+  - 비용 기반 옵티마이저의 경우에는 바로 계산이 되는 것이 아니라 통계가 필요하다.
+    - 통계치를 이용해서 비용을 뽑아야 하기 때문에 딕셔너리라는 것을 사용한다.
+    - 즉, 딕셔너리를 사용해서 비용을 어느정도 예측한 다음에 총 비용이 가장 적게 드는 것을 실행계획으로 결정한다.
+- 옵티마이저에서 결정한 실행계획에 따라서 SQL 실행 엔진을 통해 실제 실행해서 결과를 사용자에게 반환한다.
+
+### 규칙 기반 옵티마이저
+
+![image](https://github.com/MarchIDX/march_erp/assets/126429401/320ab476-0def-4206-855d-88ff9aa79119)
+
+- 1 ~ 14번까지는 인덱스 스캔(Index Scan)을 사용한다.
+- 마지막 15번이 Full Scan으로 최악의 경우를 말한다.
+- **규칙 1. Single row by Rowid**
+  - ROWID를 통해서 테이블에서 하나의 행을 액세스
+- **규칙 2. Single row by unique or primary key**
+  - Unique Index를 통해서 하나의 행을 액세스하는 방식
+  - 인덱스를 먼저 액세스하고 인덱스의 ROWID를 추출하여 행을 액세스함
+- **규칙 8. Composite index**
+  - 복합 인덱스로 검색하는 경우
+  - 복합 인덱스 사이의 우선 순위 규칙
+    - 인덱스 매칭률이 높을수록 우선
+    - 인덱스 매칭률이 동일하면, 구성 컬럼이 많을수록 우선
+    - ex) (1) A/B/C 조합과 (2) D/E 조합이 있을 때, 매칭률이 동일하면 (1) 우선
+- **규칙 9. Single column index**
+  - 단일 컬럼 인덱스에 `=` 조건으로 검색
+- **규칙 10. Bounded range search on indexed columns**
+  - 인덱스가 생성되어 있는 컬럼에 양쪽 범위를 한정하는 형태로 검색
+    - LIKE, BETWEEN
+  - 예: `X BETWEEN '10' AND '20'` / 예: `X LIKE '1%'`
+- **규칙 11. Unbounded range search on indexed columns**
+  - 인덱스가 생성되어 있는 컬럼에 한쪽 범위만 한정하는 형태로 검색
+    - >, >=, <, <=
+  - 예: A > 10
+- **규칙 15. Full Table Scan (전체 테이블 액세스)**
+  - 일반적으로 속도가 느리지만 병렬 처리 가능
+
+#### 인덱스 매칭률
+
+- 예
+  - index1 <- (학번, 나이, 생년월일)로 구성
+  - index2 <- (주민번호, 학년)으로 구성
+- 다음 질의에서는 어떤 인덱스를 사용하는 것이 효율적인가?
+  ```sql
+  SELECT *
+  FROM student
+  WHERE 학번 = '123' AND 나이 = 20 AND 주민번호 = '123456' AND 학년 = 3
+  ```
+  - `인덱스 매칭률 = (질의문에서 Equal(=) 조건으로 사용된 인덱스 컬럼 수) / 인덱스를 구성하는 컬럼 수
+    - **단 첫 컬럼부터 순서로 연속되는 경우만을 Matching으로 인정함**
+  - index1의 경우는 학번, 나이가 Equal 조건으로 사용된 인덱스 컬럼이므로 매칭률은 `2/3`
+  - index2의 경우는 주민번호, 학번이 Equal 조건으로 사용된 인덱스 컬럼이므로 매칭률은 `2/2`
+
+#### 인덱스 매칭률 계산 예
+
+- 인덱스가 순서대로 (시, 구, 동)으로 구성된 경우
+  - WHERE 시 = '서울시';
+    - 매칭률: `1/3`
+  - WHERE 시 = '서울시' AND 구 = '강남구';
+    - 매칭률: `2/3`
+  - WHERE 시 = '서울시' AND 구 = '강남구' AND 동 = '역삼동';
+    - 매칭률: `3/3`
+  - WHERE 시 = '서울시' AND 동 = '역삼동';
+    - 매칭률: `1/3`
+    - 시까지만 매칭
+  - WHERE 시 = '서울시' AND 구 LIKE '강%' AND 동 = '역삼동';
+    - 매칭률: `1/3`
+    - 시까지만 매칭
+  - WHERE 시 = '서울시' AND 구 = '강남구' AND 동 LIKE '역%';
+    - 매칭률: `2/3`
+  - WHERE 동 = '역삼동' AND 시 = '서울시' AND 구 = '강남구';
+    - 매칭률: `2/3`
+    - 시, 구까지 매칭
+  - WHERE 구 = '강남구' AND 시 = '서울시' AND 동 = '역삼동';
+    - 매칭률: `3/3`
+
+### 비용기반 옵티마이저
+
+- 규칙기반 옵티마이저의 한계
+  - 몇 개의 규칙만으로 현실의 모든 상황을 설명하기 어려무 
+    - 예: 항상 `=`이 BETWEEN보다 빠른가?
+  - SQL문 처리에 예상되는 비용(소요시간, 자원사용량)을 최소화하기 위한 방법 필요
+  - 테이블, 인덱스 컬럼등의 객체에 대한 통계정보, 시스템 통계정보 활용
+    - 정확한 통계정보 관리는 비용기반 최적화의 중요한 요소임
+  - 통계정보, DBMS 버전, DBMS 설정 정보에 따라 동일한 SQL문도 서로 다른 실행계획이 생성될 수 있음
+
+#### 비용기반 옵티마이저의 구성
+
+![image](https://github.com/MarchIDX/march_erp/assets/126429401/44e13e6d-74d4-41e1-949f-b5a39de34c19)
+
+- 질의 변환기
+  - SQL문을 보다 작업이 용이한 형태로 변환
+- 대안 계획 생성기
+  - 동일한 결과를 생성하는 다양한 대안 계획 생성(통계를 기반)
+    - 가능한 모든 계획을 생성하지는 않으므로, 최적 대안이 누락되는 경우도 있음
+- 비용 예측기
+  - 다양한 통계 정보를 활용하여 대안 계획의 비용 예측
+
+#### 실행 계획
+
+- 실행계획은 조인 순서, 조인 기법, 액세스 기법, 최적화 정보 등으로 구성
+- 조인 기법: NL Join, Sort Merge Join, Hash Join 등 사용
+- 액세스 기법: Index Scan, Full Table Scan
+- 최적화 정보는 실제 실행 결과가 아닌 통계 정보 바탕의 예측치
+  - Cost: 상대적인 비용 정보(숫자가 낮을수록 유리)
+  - Card: 주어진 조건을 만족하는 행의 수
+  - Bytes: 결과 집합이 차지하는 메모리의 양
+- 비용기반 옵티마이저의 실행 계획 예
+  ![image](https://github.com/MarchIDX/march_erp/assets/126429401/ca8f2f5b-2442-4211-885b-c5406e189867)
+
+### Full Table Scan(FTS)
+
+- 테이블 내의 모든 데이터를 읽어가면서 조건 검색
+  - 고수위 마크(HWM, High Water Mark) 아래의 모든 블록을 읽으므로 시간이 많이 소요됨
+- 다음의 경우 옵티마이저는 FTS 선택
+  - SQL문에 조건이 존재하지 않는 경우 -> 모든 데이터가 답
+  - SQL문 조건에 사용 가능한 인덱스가 없는 경우
+  - 조건을 만족하는 데이터가 매우 많은 경우 (옵티마이저의 선택)
+    - 인덱스 스캔은 한 번의 I/O 요청에 한 Block씩 데이터를 읽음
+    - FTS는 한 번의 I/O 요청으로 여러 Block을 동시에 읽음
+  - 병렬처리 방식으로 처리하는 경우
+
+### 인덱스(Index)
+
+- 검색 속도의 향상을 위한 기술
+  - 지나치게 많은 인덱스 생성 시 시간 및 공간 낭비
+  - 인덱스된 필드의 업데이트시 시간 증가
+- B-Tree 인덱스가 가장 보편적
+  - 일치(=) 검색과 범위(BETWEEN, <, >) 검색에 모두 적합
+- 유형
+  - 인덱스 유일 스캔(Index Unique Scan)
+    - Unique Index를 사용하여 단 하나의 데이터를 추출하는 방식
+    - Index 구성 컬럼에 조건이 모두 `=`로 주어진 경우
+  - 인덱스 범위 스캔(Index Range Scan)
+    - 한 건 이상의 데이터를 추출하는 방식
+    - Non-Unique Index를 이용하는 경우
+    - Index 구성 컬럼에 `=` 이외의 조건이 주어진 경우
+
+#### B-Tree Index
+
+![image](https://github.com/MarchIDX/march_erp/assets/126429401/ff7bfc3e-7a81-4105-b71c-ce97692cef51)
+
+- Root Block
+  - Branch Block 중 최상위
+- Branch Block
+  - 분기를 목적으로 함
+  - 다음 단계를 가리키는 포인터를 갖고 있음
+- Leaf Block
+  - 트리의 가장 아래 단계
+  - **인덱스 구성 컬럼의 데이터와 해당 행의 위치를 가리키는 식별자로 구성됨**
+  - Leaf Block 간 양방향 링크를 갖고 있음 -> 오름 차순, 내림 차순 검색 가능
+
+#### B-Tree 검색 예
+
+![image](https://github.com/MarchIDX/march_erp/assets/126429401/64018cd4-5fca-42d9-b77e-bff1f944adf4)
+
+- 37 이상 55 미만의 값 검색
+  - 37을 Root Node에서부터 찾는다.
+  - Leaf Block에서 37값을 찾고 다시 Root Node에서 38 -> 39 -> 40 순으로 찾는 것이 아니라
+  - Leaf Block의 양방향 링크를 통해 다음 값을 찾는다.
+
+## 조인 기법
+
+### NL(Nested Loop) 조인
+
+![image](https://github.com/MarchIDX/march_erp/assets/126429401/a7f38a6d-c075-4b7e-a890-2683fb0fdec8)
+
+- 선행 테이블(외부 테이블)과 후행 테이블(내부 테이블) 조인
+- 선행 테이블의 조건을 만족하는 행 추출 -> 후행 테이블 읽으면서 조인
+  - 이 과정을 선행 테이블의 조건을 만족하는 행 수만큼 반복
+- 결과 행의 수가 적은 테이블을 조인 순서상 선행 테이블로 두는 것이 유리
+  - 결과 행의 수가 많은 것을 선행 테이블로 두는 경우에는 그 다음 후행 테이블까지 들여다봐야 하기 때문에 비효율적이다.
+  - 따라서 결과 행의 수가 적은 것을 선행 테이블로 둬 그 다음 후행에서 덜 들여다볼 수 있도록 하는 것이 효율적이다.
+
+### Sort Merge 조인
+
+![image](https://github.com/MarchIDX/march_erp/assets/126429401/2300490e-067f-4af4-a68d-ecca8223df91)
+
+- 조인 컬럼 기준으로 데이터를 정렬한 후 조인 수행
+- 정렬할 데이터가 많은 경우에는 성능 저하
+- Non-Equi 조인 가능
+
+### Hash 조인
+
+![image](https://github.com/MarchIDX/march_erp/assets/126429401/44c0d844-13ec-47e0-85f8-cb4d31732095)
+
+- 조인 컬럼 기준으로 해쉬 함수를 수행하여, 동일한 해쉬 값을 갖는 경우에만 실제 값을 비교하여 조인 수행
+- 해시 테이블을 메모리에 생성해야 함
+  - 결과 행의 수가 적은 테이블을 선행 테이블(Build Input)로 사용하는 것이 좋음
+  - Build Input, Probe Input
+
+### 튜닝 Big3 조인
+
+- NL(Nested Loop) 조인
+  - 소규모 데이터 인덱스를 사용하여 작업하는 OLTP 업무에 적합
+  - 연결 조건 인덱스 및 드라이빙 테이블의 우선순위에 따라 성능 결정
+- Sort Merge 조인
+  - 인덱스를 사용하지 않으며, Non-Equi Join도 가능
+  - 정렬 수행에 비용이 소요됨
+- Hash 조인
+  - Equi Join만 가능하며, 데이터가 많은 경우 유리
+  - 해시 함수 계산에 비용이 소모됨
+  - 결과 행의 수가 적은 테이블을 선행 테이블로 사용하는 경우 성능 향상
+- 단계별로 다른 조인 적용 가능
+  - ex: A/B 조인에 NL Join, 그 결과와 C 조인에 Hash Join
